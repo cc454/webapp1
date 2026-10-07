@@ -1,0 +1,52 @@
+diff --git a/android/src/main/java/com/asterinet/react/bgactions/RNBackgroundActionsTask.java b/android/src/main/java/com/asterinet/react/bgactions/RNBackgroundActionsTask.java
+index 9900fc0654f1cfd75acd77b46734ea144c3dcb40..8c018675fb14700d877e1122a7597c2264818eba 100644
+--- a/android/src/main/java/com/asterinet/react/bgactions/RNBackgroundActionsTask.java
++++ b/android/src/main/java/com/asterinet/react/bgactions/RNBackgroundActionsTask.java
+@@ -81,6 +81,10 @@ final public class RNBackgroundActionsTask extends HeadlessJsTaskService {
+ 
+     @Override
+     public int onStartCommand(Intent intent, int flags, int startId) {
++        if (intent == null) {
++            stopSelf(startId);
++            return START_NOT_STICKY;
++        }
+         final Bundle extras = intent.getExtras();
+         if (extras == null) {
+             throw new IllegalArgumentException("Extras cannot be null");
+@@ -91,7 +95,20 @@ final public class RNBackgroundActionsTask extends HeadlessJsTaskService {
+         final Notification notification = buildNotification(this, bgOptions);
+ 
+         startForeground(SERVICE_NOTIFICATION_ID, notification);
+-        return super.onStartCommand(intent, flags, startId);
++        super.onStartCommand(intent, flags, startId);
++        // The task closure is registered by the user's Generate action. If the
++        // process is killed, the app resumes its SQLite checkpoint on demand.
++        return START_NOT_STICKY;
++    }
++
++    @Override
++    public void onTimeout(int startId) {
++        stopSelf(startId);
++    }
++
++    @Override
++    public void onTimeout(int startId, int fgsType) {
++        stopSelf(startId);
+     }
+ 
+     private void createNotificationChannel(@NonNull final String taskTitle, @NonNull final String taskDesc) {
+diff --git a/src/index.js b/src/index.js
+index 37193998d01feb278b15e8fb663104c933425285..d9811c2094843e0f3eb77098f165e4c793a2c69a 100644
+--- a/src/index.js
++++ b/src/index.js
+@@ -100,7 +100,9 @@ class BackgroundServer extends EventEmitter {
+         return async () => {
+             await new Promise((resolve) => {
+                 self._stopTask = resolve;
+-                task(parameters).then(() => self.stop());
++                task(parameters).then(() => {
++                    if (self.isRunning()) return self.stop();
++                });
+             });
+         };
+     }

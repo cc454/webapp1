@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { AppState, Plan } from './types';
+import { AppState, Plan, GenerationDraft } from './types';
 import { emptyState } from './defaults';
-import { loadState, saveState, getApiKey, getGarminPassword, saveApiKey, saveGarminPassword } from './storage';
+import { loadState, saveState, getApiKey, getGarminPassword, saveApiKey, saveGarminPassword, loadGenerationDraft, saveGenerationDraft, clearGenerationDraft } from './storage';
 import { loadBundledMarkdown, pickMarkdownFile, pickTextFile } from './markdown';
 import { parseGoalMarkdown } from './goal';
 import { acceptProposal, upcoming } from './plan';
-import { generatePlan, askCoach } from './llm';
+import { generatePlan, askCoach, generationSignature } from './llm';
+import { withGenerationBackground, generationProgress, subscribeGeneration, cancelBackgroundGeneration } from './generationBackground';
 import { appendExchange } from './chat';
 import { disconnect, isConnected, pullActivitySummaries, pullFitness, signIn } from './garmin';
 import { shareBackup, shareExport } from './exports';
@@ -23,16 +24,49 @@ function useController() {
   const [notice, setNotice] = useState('');
   const [connected, setConnected] = useState(false);
   const [review, setReview] = useState<Review | null>(null);
+  const [draft, setDraft] = useState<GenerationDraft | null>(null);
+  const [draftError, setDraftError] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const locked = useRef(false);
   const current = useRef(state);
   const generator = useRef<AbortController | null>(null);
   useEffect(() => {
     let mounted = true;
-    loadState().then(value => { if (mounted) { current.current = value; setState(value); setReady(true); } })
+    let generationSeen = false;
+    const unsubscribe = subscribeGeneration(text => {
+      if (!mounted) return;
+      setBusy(text);
+      if (text) generationSeen = true;
+      else if (generationSeen) {
+        generationSeen = false;
+        void loadGenerationDraft().then(saved => {
+          if (!mounted) return;
+          setDraft(saved);
+          const value = current.current;
+          if (saved && saved.overview.at(-1)?.end === saved.end && saved.signature === generationSignature(value, saved.request)) {
+            const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: saved.start, end: saved.end, rules: value.settings.rules, workouts: saved.workouts, overview: saved.overview }, value.event!, value.settings.rules);
+            setReview({ kind: 'proposal', plan });
+          }
+        }).catch(e => { if (mounted) setError(e instanceof Error ? e.message : 'Saved generation could not load.'); });
+      }
+    });
+    loadState().then(async value => {
+      let savedDraft: GenerationDraft | null = null;
+      try { savedDraft = await loadGenerationDraft(); }
+      catch (e) { if (mounted) { setDraftError(true); setError(e instanceof Error ? e.message : 'Generation draft could not load.'); } }
+      if (mounted) {
+        current.current = value; setState(value); setDraft(savedDraft); setReady(true);
+        if (savedDraft?.overview.at(-1)?.end === savedDraft?.end && savedDraft && savedDraft.signature === generationSignature(value, savedDraft.request)) {
+          try {
+            const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: savedDraft.start, end: savedDraft.end, rules: value.settings.rules, workouts: savedDraft.workouts, overview: savedDraft.overview }, value.event!, value.settings.rules);
+            setReview({ kind: 'proposal', plan });
+          } catch { setDraftError(true); setError('Saved proposal failed validation. Discard the draft before restarting.'); }
+        }
+      }
+    })
       .catch(e => { if (mounted) { setError(e.message); setRecovery(true); setReady(true); } });
     isConnected().then(value => { if (mounted) setConnected(value); }).catch(() => {});
-    return () => { mounted = false; generator.current?.abort(); };
+    return () => { mounted = false; unsubscribe(); if (Platform.OS !== 'android') generator.current?.abort(); };
   }, []);
   async function commit(value: AppState) {
     await saveState(value);
@@ -45,10 +79,12 @@ function useController() {
     finally { locked.current = false; setBusy(''); }
   }
   const available = ready && !busy && !recovery;
-  return { state, ready, recovery, busy, error, notice, connected, review, threadId, available,
+  return { state, ready, recovery, busy, error, notice, connected, review, draft, draftError, threadId, available,
     setReview, setThreadId,
-    cancelGeneration: () => generator.current?.abort(),
-    reset: () => run('Resetting local data…', async () => { await commit(emptyState()); setRecovery(false); setReview(null); setThreadId(null); setNotice('Local plan and chat data reset. Credentials are unchanged.'); }),
+    cancelGeneration: () => { generator.current?.abort(); cancelBackgroundGeneration(); },
+    discardDraft: () => run('Discarding generation draft…', async () => { await clearGenerationDraft(); setDraft(null); setDraftError(false); setNotice('Generation draft discarded.'); }),
+    rejectReview: () => run('Rejecting proposal…', async () => { if (review?.kind === 'proposal') { await clearGenerationDraft(); setDraft(null); } setReview(null); }),
+    reset: () => run('Resetting local data…', async () => { await clearGenerationDraft(); setDraft(null); setDraftError(false); await commit(emptyState()); setRecovery(false); setReview(null); setThreadId(null); setNotice('Local plan and chat data reset. Credentials are unchanged.'); }),
     configure: (settings: AppState['settings'], key: string, password: string) => run('Saving settings…', async () => {
       if (key.trim()) await saveApiKey(key); if (Platform.OS !== 'web' && password) await saveGarminPassword(password);
       await commit({ ...current.current, settings }); setNotice('Settings saved. Secret fields have been cleared.');
@@ -67,9 +103,14 @@ function useController() {
     }),
     generate: (request = '') => run('Preparing proposal…', async () => {
       if (review) throw new Error('Accept or reject the current review first.');
+      if (draftError) throw new Error('Discard the damaged generation draft before restarting.');
       const controller = new AbortController(); generator.current = controller;
       try {
-        const plan = await generatePlan(current.current, await getApiKey() ?? '', request, setBusy, controller.signal);
+        const key = await getApiKey() ?? '';
+        if (!key.trim()) throw new Error('Add your OpenRouter API key in Settings before generating a plan.');
+        const plan = await withGenerationBackground(() => generatePlan(current.current, key, request, text => { setBusy(text); generationProgress(text); }, controller.signal, {
+          draft, save: async value => { await saveGenerationDraft(value); setDraft(value); },
+        }), () => controller.abort());
         // Also checks completed history against the proposal before showing accept.
         const checked = acceptProposal(current.current.plan, plan, current.current.event!, current.current.settings.rules);
         setReview({ kind: 'proposal', plan: checked });
@@ -83,7 +124,7 @@ function useController() {
         if (issues.length) throw new Error(issues.join('\n'));
       }
       const plan = review.kind === 'restore' ? review.plan : acceptProposal(value.plan, review.plan, value.event!, value.settings.rules);
-      await commit({ ...value, event: plan.event, plan }); setReview(null); setNotice('Reviewed plan saved.'); setRecovery(false);
+      await commit({ ...value, event: plan.event, plan }); await clearGenerationDraft(); setDraft(null); setReview(null); setNotice('Reviewed plan saved.'); setRecovery(false);
     }),
     toggle: (id: string) => run('Saving completion…', async () => {
       const value = current.current; if (!value.plan || review) return;

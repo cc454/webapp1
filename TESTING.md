@@ -2,6 +2,16 @@
 
 Updated 7 October 2026 after recovery from a reboot. Passing automated cases are evidence for the named logic, not proof of native device behavior or real-service compatibility.
 
+## Phone feedback and 0.1.3 update
+
+The owner reached week 27, then encountered “Step durations do not match session: 2027-04-08,” losing the unsaved proposal after a $3.60 run. Generated interval totals and overview volumes are now derived locally before scheduling validation. A regression reproduces the April 8 mismatch and resolves it in one provider request; a derived Monday total above the cap remains rejected. Imported backups retain strict validation.
+
+Each validated weekly batch is persisted separately from the active plan. A failed-second-week fixture resumes on the next day with one request and the original creation date; complete drafts reopen without provider calls. Changed inputs are rejected before requests. UI tests cover restored proposals, review/rejection, and damaged-draft discard without losing a valid active plan. Earlier app versions did not persist these drafts, so this update cannot recover their lost generation.
+
+Android uses a foreground dataSync service and wake lock, with progress notifications and cancellation. Automated tests cover native task registration, progress, duplicate prevention, cancellation after provider remount, and cleanup on success/failure. The library patch avoids sticky restart of an unregistered task and stops on Android service timeout. APK inspection confirms FOREGROUND_SERVICE, FOREGROUND_SERVICE_DATA_SYNC, WAKE_LOCK, POST_NOTIFICATIONS, a non-exported service, and service type dataSync. Screen-off and app-switch behavior still need physical-device acceptance; force-stop/reboot/OS termination require manual resume from retained weeks.
+
+Strict TypeScript, 105 tests across 16 suites, web export, and native packaging pass. The final incremental Android build includes the latest application source. Signature matches the owner's installed build: version 0.1.3, code 4, target API 36, ARM64/ARMv7. Reduced context and concise-output instructions are tested; no live cost reduction or cheaper-model plan quality has been measured. Model remains user-selected. Prompt caching is documented as a future option, not enabled.
+
 ## Phone feedback and 0.1.2 update
 
 The owner now confirms Garmin connection/activity import and the chat keyboard/draft behavior work. Live chat remains functional; plan generation reports “JSON Parse error: Unexpected end of input.” This originates outside the weekly plan JSON-validation handler in the transport envelope parser. Empty/truncated envelopes are now translated into useful errors; plan requests use SSE keep-alives and a bounded transport retry, rejecting unfinished streams and HTTP-200 provider errors. This fixes the unhandled parse-error path; the exact cause of the owner's truncated response and live generation recovery still need a phone recheck.
@@ -31,7 +41,7 @@ The 0.1.1 update replaces the web-cookie Garmin transport with mobile token auth
 
 ## Acceptance-case traceability
 
-Current APK 0.1.2 (version code 3): `artifacts/stride-ai-release.apk`, 59,740,324 bytes. SHA-256: `a07be1ed491dbc59794361096a39d1e292f3fe35193012fbe1c5fd4c1dddab9e`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
+Current APK 0.1.3 (version code 4): `artifacts/stride-ai-release.apk`, 59,764,896 bytes. SHA-256: `2eda3d88df550bdf78de531ac4fee7cb924659f6c5cf7571b5e1fcb2b96adf1f`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
 
 Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md. “Pending” and “partial” are intentional: the Android release is not yet fully accepted.
 
@@ -89,6 +99,10 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-50 | garmin.test.ts and markdown-chat.test.tsx cover precise VO₂, cycling FTP/kg, missing values, profile fallback, zone ranges, timestamps, cache warnings, and Settings display. app.test.tsx verifies activity persistence with optional metric failures. Live metric comparison pending. |
 | AT-51 | markdown-chat.test.tsx covers headings/emphasis/lists/quotes/code/tables/links, literal HTML, blocked unsafe protocols, and image descriptions. Native visual recheck pending. |
 | AT-52 | llm.test.ts covers complete/truncated SSE, keep-alives, malformed JSON, HTTP-200 provider errors, bounded retry, and full 27-week horizon; app.test.tsx verifies explicit acceptance before save. Live plan recheck pending. |
+| AT-53 | generation-resume.test.ts reproduces April 8 step mismatch and verifies repeat arithmetic without a paid repair; derived Monday limit is still enforced. backup.test.ts retains strict imported-plan validation. |
+| AT-54 | generation-resume.test.ts covers late failure/resume, next-day original dates, complete drafts without requests, and changed inputs. app.test.tsx covers completed-proposal restoration/rejection and corrupt-draft recovery. storage.test.ts verifies a separate SQLite draft table. Physical SQLite restart/resume check pending. |
+| AT-55 | generation-background.test.ts covers registration/progress/cleanup/duplicates/cancellation after remount. Native APK permissions and service type verified. Screen-off, app switch, and force-stop/resume checks remain pending on the owner's phone. |
+| AT-56 | generation-resume.test.ts inspects compact activities, preserved HR, concise output instructions, selected model, local correction and resume request counts. Previous sessions are bounded to fourteen in source. README documents current prices and caching limitations. Actual billing and cheaper-model quality comparison pending. |
 
 ## Device acceptance sequence
 
@@ -99,5 +113,6 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 5. Mark a workout complete, restart, resume a chat, request/review a revision, and verify completion history survives.
 6. Export all three formats and import the calendar into a real calendar app. Back up, reject a restore, then accept the restore.
 7. Test offline use, failed requests, session expiry, and an upgrade with the same signing identity.
+8. Start generation, permit notifications, turn the screen off and switch apps; verify continuing progress and review. Cancel/reopen/resume and verify completed weeks are retained. Force-stop after a saved week, reopen, and resume; record billing and confirm already validated weeks are not requested again.
 
 Do not record keys, passwords, session cookies, or private raw account data in test evidence committed to Git.

@@ -1,12 +1,12 @@
 import * as SQLite from 'expo-sqlite';
 import * as SecureStore from 'expo-secure-store';
-import { AppState, stateSchema } from './types';
+import { AppState, stateSchema, generationDraftSchema, GenerationDraft } from './types';
 import { emptyState } from './defaults';
 import { checkedPlan } from './plan';
 let database: Promise<SQLite.SQLiteDatabase> | undefined;
 async function db() {
   database ??= SQLite.openDatabaseAsync('stride-ai.db').then(async d => {
-    await d.execAsync('PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL);');
+    await d.execAsync('PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS generation (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL);');
     return d;
   });
   return database;
@@ -21,6 +21,16 @@ export async function saveState(state: AppState) {
   const value = JSON.stringify(stateSchema.parse(state));
   await (await db()).runAsync('INSERT INTO state(id,value) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value', value);
 }
+export async function loadGenerationDraft(): Promise<GenerationDraft | null> {
+  const row = await (await db()).getFirstAsync<{ value: string }>('SELECT value FROM generation WHERE id=1');
+  if (!row) return null;
+  try { return generationDraftSchema.parse(JSON.parse(row.value)); }
+  catch { throw new Error('The saved generation draft is damaged. Discard it in Plan before restarting.'); }
+}
+export async function saveGenerationDraft(value: GenerationDraft) {
+  await (await db()).runAsync('INSERT INTO generation(id,value) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value', JSON.stringify(generationDraftSchema.parse(value)));
+}
+export async function clearGenerationDraft() { await (await db()).runAsync('DELETE FROM generation WHERE id=1'); }
 export const saveApiKey = (key: string) => key.trim() ? SecureStore.setItemAsync('openrouter-api-key', key.trim()) : SecureStore.deleteItemAsync('openrouter-api-key');
 export const getApiKey = () => SecureStore.getItemAsync('openrouter-api-key');
 export const saveGarminPassword = (password: string) => password ? SecureStore.setItemAsync('garmin-password', password) : Promise.resolve();

@@ -1,4 +1,4 @@
-import { AppState, stateSchema } from './types';
+import { AppState, stateSchema, generationDraftSchema, GenerationDraft } from './types';
 import { emptyState } from './defaults';
 import { checkedPlan } from './plan';
 // Browser secrets are memory-only. This preview does not offer native secure storage.
@@ -10,6 +10,14 @@ export async function loadState(): Promise<AppState> {
   catch { throw new Error('Browser data is invalid. Restore a backup or explicitly reset local data.'); }
 }
 export async function saveState(state: AppState) { localStorage.setItem('stride-ai-v1', JSON.stringify(stateSchema.parse(state))); }
+export async function loadGenerationDraft(): Promise<GenerationDraft | null> {
+  const raw = localStorage.getItem('stride-generation-v1');
+  if (!raw) return null;
+  try { return generationDraftSchema.parse(JSON.parse(raw)); }
+  catch { throw new Error('The saved generation draft is damaged. Discard it in Plan before restarting.'); }
+}
+export async function saveGenerationDraft(value: GenerationDraft) { localStorage.setItem('stride-generation-v1', JSON.stringify(generationDraftSchema.parse(value))); }
+export async function clearGenerationDraft() { localStorage.removeItem('stride-generation-v1'); }
 export async function saveApiKey(key: string) { key.trim() ? secrets.set('key', key.trim()) : secrets.delete('key'); }
 export async function getApiKey() { return secrets.get('key') ?? null; }
 export async function saveGarminPassword(_password: string) { throw new Error('Garmin sign-in requires the Android app.'); }

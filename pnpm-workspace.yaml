@@ -1,6 +1,7 @@
 nodeLinker: hoisted
 patchedDependencies:
   expo-modules-autolinking@57.0.14: patches/expo-modules-autolinking-57.0.14.patch
+  react-native-background-actions@4.0.1: patches/react-native-background-actions@4.0.1.patch
 minimumReleaseAgeExclude:
   - '@expo/cli@57.0.28'
   - '@expo/config-plugins@57.0.10'

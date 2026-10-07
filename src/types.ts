@@ -64,3 +64,8 @@ export type ChatThread = z.infer<typeof threadSchema>;
 export type Message = z.infer<typeof messageSchema>;
 export type AppState = z.infer<typeof stateSchema>;
 export type AppSettings = AppState['settings'];
+export const generationDraftSchema = z.object({
+  version: z.literal(1), signature: z.string(), request: z.string().default(''), start: isoDate, end: isoDate,
+  workouts: z.array(workoutSchema), overview: z.array(overviewSchema),
+});
+export type GenerationDraft = z.infer<typeof generationDraftSchema>;

@@ -1,7 +1,7 @@
 const mockGet = jest.fn(); const mockRun = jest.fn();
 jest.mock('expo-sqlite', () => ({ openDatabaseAsync: jest.fn(async () => ({ execAsync: jest.fn(), getFirstAsync: mockGet, runAsync: mockRun })) }));
 jest.mock('expo-secure-store', () => ({ getItemAsync: jest.fn(), setItemAsync: jest.fn(), deleteItemAsync: jest.fn() }));
-import { loadState, saveState, saveApiKey, saveGarminPassword, saveGarminSession } from '../src/storage';
+import { loadState, saveState, saveApiKey, saveGarminPassword, saveGarminSession, loadGenerationDraft, saveGenerationDraft, clearGenerationDraft } from '../src/storage';
 import * as SecureStore from 'expo-secure-store';
 import { emptyState } from '../src/defaults';
 describe('AT-16,19,27,41: local persistence', () => {
@@ -18,5 +18,11 @@ describe('AT-16,19,27,41: local persistence', () => {
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith('openrouter-api-key', 'key');
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith('garmin-password', 'password'); expect(SecureStore.setItemAsync).toHaveBeenCalledTimes(3);
     await saveApiKey(''); expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('openrouter-api-key');
+  });
+  it('persists draft checkpoints separately from the active plan and clears only the draft',async()=>{
+    const draft={version:1 as const,signature:'inputs',request:'',start:'2027-04-05',end:'2027-04-11',workouts:[],overview:[]};
+    await saveGenerationDraft(draft);expect(mockRun.mock.calls[0]![0]).toContain('INSERT INTO generation');
+    mockGet.mockResolvedValue({value:JSON.stringify(draft)});await expect(loadGenerationDraft()).resolves.toEqual(draft);
+    await clearGenerationDraft();expect(mockRun.mock.calls.at(-1)[0]).toBe('DELETE FROM generation WHERE id=1');
   });
 });

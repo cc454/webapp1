@@ -1,20 +1,21 @@
-jest.mock('../src/storage', () => ({ loadState: jest.fn(), saveState: jest.fn(), getApiKey: jest.fn(), getGarminPassword: jest.fn(), saveApiKey: jest.fn(), saveGarminPassword: jest.fn() }));
+jest.mock('../src/generationBackground', () => ({ withGenerationBackground: (task: () => Promise<unknown>) => task(), generationProgress: jest.fn(), subscribeGeneration: () => () => {}, cancelBackgroundGeneration: jest.fn() }));
+jest.mock('../src/storage', () => ({ loadState: jest.fn(), loadGenerationDraft: jest.fn(async () => null), saveGenerationDraft: jest.fn(), clearGenerationDraft: jest.fn(), saveState: jest.fn(), getApiKey: jest.fn(), getGarminPassword: jest.fn(), saveApiKey: jest.fn(), saveGarminPassword: jest.fn() }));
 jest.mock('../src/garmin', () => ({ isConnected: jest.fn(async () => false), disconnect: jest.fn(), pullActivitySummaries: jest.fn(), pullFitness: jest.fn(), signIn: jest.fn() }));
 jest.mock('../src/exports', () => ({ shareBackup: jest.fn(), shareExport: jest.fn() }));
 jest.mock('../src/markdown', () => ({ loadBundledMarkdown: jest.fn(), pickMarkdownFile: jest.fn(), pickTextFile: jest.fn() }));
-jest.mock('../src/llm', () => ({ generatePlan: jest.fn(), askCoach: jest.fn(), isTruncated: () => false }));
+jest.mock('../src/llm', () => ({ generatePlan: jest.fn(), askCoach: jest.fn(), isTruncated: () => false, generationSignature: () => 'saved-inputs' }));
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import App from '../App';
-import { loadState, saveState } from '../src/storage';
+import { loadState, saveState, getApiKey, loadGenerationDraft, clearGenerationDraft } from '../src/storage';
 import { generatePlan } from '../src/llm';
 import { emptyState } from '../src/defaults';
 import { fixturePlan } from './fixtures';
 import { isConnected, pullActivitySummaries, pullFitness } from '../src/garmin';
 import { AppProvider } from '../src/appContext';
-import { SettingsScreen } from '../src/screens';
+import { SettingsScreen, PlanScreen } from '../src/screens';
 describe('AT-14,32,38: rendered app flows', () => {
-  beforeEach(() => { (saveState as jest.Mock).mockResolvedValue(undefined); });
+  beforeEach(() => { (saveState as jest.Mock).mockResolvedValue(undefined); (getApiKey as jest.Mock).mockResolvedValue('fixture-key'); });
   it('renders empty onboarding without saving on startup', async () => {
     (loadState as jest.Mock).mockResolvedValue(emptyState()); render(<App />);
     await screen.findByText('Start with your event'); expect(saveState).not.toHaveBeenCalled();
@@ -34,6 +35,21 @@ describe('AT-14,32,38: rendered app flows', () => {
   it('shows recovery without overwriting corrupt state', async () => {
     (loadState as jest.Mock).mockRejectedValue(new Error('Damaged data')); render(<App />);
     await screen.findByText('Damaged data'); expect(saveState).not.toHaveBeenCalled();
+  });
+  it('recovers a complete draft as a review without activating it or calling the model', async () => {
+    const state=emptyState(); const plan=fixturePlan(); state.event=plan.event;
+    (loadState as jest.Mock).mockResolvedValue(state); (loadGenerationDraft as jest.Mock).mockResolvedValueOnce({version:1,request:'',signature:'saved-inputs',start:plan.start,end:plan.end,workouts:plan.workouts,overview:plan.overview});
+    render(<AppProvider><PlanScreen /></AppProvider>); await screen.findByText('PROPOSAL / NOT SAVED');
+    expect(saveState).not.toHaveBeenCalled(); expect(generatePlan).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByRole('button',{name:'Reject'})); await waitFor(()=>expect(clearGenerationDraft).toHaveBeenCalled()); expect(saveState).not.toHaveBeenCalled();
+  });
+  it('allows a damaged draft to be discarded without resetting the valid active plan',async()=>{
+    const state=emptyState(); state.plan=fixturePlan();state.event=state.plan.event;
+    (loadState as jest.Mock).mockResolvedValue(state);(loadGenerationDraft as jest.Mock).mockRejectedValueOnce(new Error('Draft damaged'));
+    render(<AppProvider><PlanScreen /></AppProvider>);await screen.findByText('Draft damaged');expect(saveState).not.toHaveBeenCalled();
+    expect(screen.getByRole('button',{name:'Resume generation'})).toBeDisabled();
+    fireEvent.press(screen.getByRole('button',{name:'Discard saved draft'}));fireEvent.press(screen.getByRole('button',{name:'Confirm discard draft'}));
+    await waitFor(()=>expect(clearGenerationDraft).toHaveBeenCalled());expect(saveState).not.toHaveBeenCalled();
   });
   it('saves successful activities even if optional fitness refresh has a warning', async () => {
     const state=emptyState(); (loadState as jest.Mock).mockResolvedValue(state);

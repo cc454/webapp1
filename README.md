@@ -6,7 +6,7 @@ A local-first personal trainer for running and cycling, built with Expo, React N
 
 The app now includes Plan, Chat, and Settings; goal/guidance imports; rolling seven-day views; plan validation and review; OpenRouter coaching; ten conversation threads; SQLite persistence on Android; exports; and versioned plan backup/restore. A browser preview uses local browser storage and memory-only API keys.
 
-The owner verified Android installation, OpenRouter chat with Claude Sonnet 4.6, Markdown imports, Garmin connection/activity import, and keyboard/draft behavior. The 0.1.2 changes pass strict checking, 93 automated tests, web export, and clean-install CI. The Android APK is built and its version/signature verified. This update adds chat Markdown, Garmin fitness metrics, a 50-activity limit, response recovery, and explicit constraint-aware schedule construction. Live full-plan generation and the new metrics still need a phone recheck. See [verification status](TESTING.md).
+The owner verified Android installation, OpenRouter chat with Claude Sonnet 4.6, Markdown imports, Garmin connection/activity import, and keyboard/draft behavior. The 0.1.3 changes pass strict checking, 105 automated tests, web export, and native APK packaging. This update calculates interval duration totals locally, saves validated generation weeks separately from the active plan, supports resume, and runs Android generation in a foreground service. Full-plan generation, screen-off behavior, and fitness metrics still need a phone recheck. See [verification status](TESTING.md).
 
 Garmin sign-in and activity sync are confirmed working on the owner's phone. The native adapter fetches the last 50 activities and retains supported running/cycling summaries, including optional HR, speed, elevation, power, and cadence. Sync also fetches running/cycling VO₂ max, cycling FTP/kg and FTP, and configured heart-rate zones, displaying units and fetch timestamps in Settings and including them in coach context. Failed optional metric endpoints retain cached values with warnings; missing values remain unavailable. Lap detail, load, and recovery endpoints are pending. Garmin workout push is deferred. Native iOS and Ona are out of scope.
 
@@ -50,7 +50,7 @@ The generated release variant uses the template debug certificate for personal t
 1. In Settings, load the project goal, research, and constraints, or import your own .md/.txt files.
 2. Configure an OpenRouter model and API key, then save settings. Native keys are stored in SecureStore. The default model is anthropic/claude-sonnet-4.6; generation uses structured output when supported and otherwise requests JSON with the same local validation.
 3. Save Garmin email/password, connect, and sync activities on Android. An error leaves the cache intact; a session error requires reauthentication.
-4. Generate your plan from Plan. Longer plans are generated in seven-day batches; progress and cancellation are available. Each request tells the model to select rest days and permitted long/hard-session dates before filling in details, with explicit weekday/date-specific Monday duration limits and the saved additional guidance. Dates and rule values are also constrained in the provider schema. OpenRouter plan requests use SSE keep-alives, validate complete responses, and retry an incomplete response once before reporting a useful error. No partial plan is activated. Review the proposed sessions before accepting.
+4. Generate your plan from Plan. Longer plans are generated in seven-day batches; progress and cancellation are available. Each request tells the model to select rest days and permitted long/hard-session dates before filling in details, with explicit weekday/date-specific Monday duration limits and the saved additional guidance. Dates and rule values are also constrained in the provider schema. OpenRouter plan requests use SSE keep-alives, validate complete responses, and retry an incomplete response once before reporting a useful error. Each valid week is saved as a draft; Resume generation continues from the next week with the original creation date. No partial plan is activated. Review the proposed sessions before accepting.
 5. Use Chat for advice. To change the plan, enter a request and select Propose plan changes, then review it on Plan.
 6. Back up the current plan before clearing it or changing events. Restore previews a JSON backup before replacing the active plan.
 
@@ -59,6 +59,22 @@ Ten chats means ten conversation threads ordered by recent use. The oldest is re
 The native Garmin adapter uses the [maintained client's mobile service-ticket/token flow](https://github.com/cyberjunky/python-garminconnect/blob/master/garminconnect/client.py) and `connectapi.garmin.com` bearer authentication. It verifies profile access before saving tokens in SecureStore and refreshes an expired access token once. Fitness endpoint mappings follow the [Garmin client implementation](https://github.com/cyberjunky/ha-garmin/blob/main/src/ha_garmin/client.py). Plan response handling follows [OpenRouter streaming](https://openrouter.ai/docs/api_reference/streaming) and [response error handling](https://openrouter.ai/docs/api_reference/errors-and-debugging).
 
 Chat keeps its composer below the scrolling messages and resizes around the Android keyboard. A successful, saved response clears the submitted draft; failures retain it. Multiline fields have a bounded height and an internal scroll indicator. Operations automatically reveal progress/errors at the top of the page. Plan generation retries a weekly response up to twice for validation repairs and supports a locally validated JSON prompt fallback when a provider cannot accept structured output.
+
+Android generation uses a foreground data-transfer service and wake lock, with a progress notification. Allow notifications when prompted. Switching apps or turning the screen off should keep generation running; force-stop, reboot, Android service time limits, or manufacturer restrictions can interrupt it. Reopen Plan and resume the saved draft afterward. Completed proposals survive restart and still require review. Cancel retains valid weeks; rejecting a proposal or confirming Discard draft removes them. Changed event/model/rules/guidance/baseline inputs require discarding the previous draft before restarting. Browser generation does not have Android background guarantees. Drafts from older app versions cannot be recovered retrospectively.
+
+## Generation cost
+
+The selected model remains unchanged. Generation now sends compact activity summaries and only the previous fourteen sessions, requests concise descriptions, calculates step totals (including repeats) and overview volumes locally, and retains completed weeks to avoid regenerating them after a late failure. Monday and other scheduling rules still apply to the derived totals. Actual cost savings require a live billing comparison.
+
+Current standard prices per million input/output tokens, checked 7 October 2026:
+
+| Model | Input | Output |
+| --- | ---: | ---: |
+| [Claude Sonnet 4.6](https://openrouter.ai/anthropic/claude-sonnet-4.6) | $3 | $15 |
+| [Claude Haiku 4.5](https://openrouter.ai/anthropic/claude-haiku-4.5) | $1 | $5 |
+| [Gemini 2.5 Flash](https://openrouter.ai/google/gemini-2.5-flash) | $0.30 | $2.50 |
+
+Choose a cheaper model in Settings and check its plan quality before relying on it. Haiku is one-third of Sonnet's standard token prices; total cost also depends on output length and retries. Shorter research text reduces repeatedly billed input. Future options include a smaller output protocol, fewer batches, and explicit [prompt caching](https://openrouter.ai/docs/guides/best-practices/prompt-caching). Caching is not enabled: it requires a stable supported prefix, charges for cache writes, and does not reduce output charges; the per-week structured schema currently changes.
 
 ## Goal and scheduling rules
 

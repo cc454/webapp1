@@ -39,12 +39,13 @@ function Review() {
     {expanded && plan.workouts.map(w => <View key={w.id} style={{ borderTopWidth: 1, borderColor: colors.edge, paddingTop: 12, gap: 5 }}><Text style={s.body}>{w.date} · {w.title}</Text><Text style={s.muted}>{w.sport} · {duration(w.durationSeconds)} · {w.distanceKm} km · {w.intensity}</Text><Text style={s.muted}>{w.detail}</Text>{w.steps.map((step, i) => <Text key={i} style={s.muted}>{step.repeats} × {duration(step.seconds)} {step.kind} · {step.target}</Text>)}</View>)}
     <Text style={s.muted}>{app.review.kind === 'restore' ? 'Acceptance replaces the current plan and event. Device settings, credentials, and chats are retained.' : 'Acceptance saves this validated proposal. Completed workouts remain preserved.'}</Text>
     {issues.map(issue => <Text key={issue} style={s.error}>{issue}</Text>)}
-    <View style={s.row}><Button title="Accept and save" onPress={app.accept} disabled={!!app.busy || !!issues.length} /><Button title="Reject" secondary onPress={() => app.setReview(null)} disabled={!!app.busy} /></View>
+    <View style={s.row}><Button title="Accept and save" onPress={app.accept} disabled={!!app.busy || !!issues.length} /><Button title="Reject" secondary onPress={app.rejectReview} disabled={!!app.busy} /></View>
   </Card>;
 }
 export function PlanScreen() {
   const app = useApp(); const { state } = app;
   const [overview, setOverview] = useState(false);
+  const [discardDraft, setDiscardDraft] = useState(false);
   const [date, setDate] = useState(today);
   useEffect(() => { const interval = setInterval(() => setDate(today()), 60000); return () => clearInterval(interval); }, []);
   const event = state.plan?.event ?? state.event;
@@ -52,7 +53,8 @@ export function PlanScreen() {
   return <Page title="Your next seven days" subtitle="A clear plan. Room to adapt.">
     {event ? <Card><Text style={s.eyebrow}>TARGET EVENT</Text><Text style={s.heading}>{event.name}</Text><Text style={s.body}>{event.date} · {event.distanceKm} km · {event.elevationM} m gain</Text><Text style={s.muted}>Target {duration(event.targetSeconds)} · {pace(event.targetSeconds, event.distanceKm)}</Text></Card> : <Card><Text style={s.heading}>Start with your event</Text><Text style={s.body}>Load goal.md in Settings, connect Garmin, then generate your first plan for review.</Text></Card>}
     <Review />
-    {!state.plan && <Card><Text style={s.heading}>Build your starting plan</Text><Text style={s.body}>The coach uses your goal, available Garmin history, and training guidance. You review the proposal before saving it.</Text>{!state.lastSync && <Text style={s.muted}>No Garmin data synced yet. A proposal may be less personalized.</Text>}<Button title="Generate initial plan" onPress={() => app.generate()} disabled={!app.available || !state.event || !!app.review} /></Card>}
+    {(app.draft || app.draftError) && !app.review && <Card><Text style={s.heading}>Saved generation draft</Text><Text style={s.body}>{app.draft?.overview.length ?? 0} validated weeks retained. Resume retries the unfinished week without regenerating earlier weeks. The active plan is unchanged.</Text><Button title="Resume generation" onPress={() => app.generate(app.draft!.request)} disabled={!app.available || app.draftError} /><Button title="Discard saved draft" secondary onPress={() => setDiscardDraft(true)} disabled={!app.available} />{discardDraft && <><Text style={s.error}>Discarding loses these generated weeks. A fresh run may charge for them again.</Text><Button title="Confirm discard draft" secondary onPress={() => { app.discardDraft(); setDiscardDraft(false); }} disabled={!app.available} /></>}</Card>}
+    {!state.plan && <Card><Text style={s.heading}>Build your starting plan</Text><Text style={s.body}>The coach uses your goal, available Garmin history, and training guidance. Android generation continues with the screen off or while using another app; progress appears in a notification. Validated weeks are saved as a draft. You review the complete proposal before saving it.</Text>{!state.lastSync && <Text style={s.muted}>No Garmin data synced yet. A proposal may be less personalized.</Text>}<Button title="Generate initial plan" onPress={() => app.generate()} disabled={!app.available || !state.event || !!app.review || !!app.draft || app.draftError} /></Card>}
     {state.plan && <>
       <View style={s.row}><Text style={s.eyebrow}>{date} → {addDays(date, 6)}</Text><Text style={s.muted}>Revision {state.plan.revision}</Text></View>
       {Array.from({ length: 7 }, (_, i) => addDays(date, i)).map(day => <View key={day} style={{ gap: 10 }}><Text style={s.label}>{day}{day === event?.date ? ' · EVENT DAY' : ''}</Text>

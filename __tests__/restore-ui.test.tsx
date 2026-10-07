@@ -1,4 +1,5 @@
-jest.mock('../src/storage', () => ({ loadState: jest.fn(), saveState: jest.fn(), getApiKey: jest.fn(), getGarminPassword: jest.fn(), saveApiKey: jest.fn(), saveGarminPassword: jest.fn() }));
+jest.mock('../src/generationBackground', () => ({ withGenerationBackground: (task: () => Promise<unknown>) => task(), generationProgress: jest.fn(), subscribeGeneration: () => () => {}, cancelBackgroundGeneration: jest.fn() }));
+jest.mock('../src/storage', () => ({ loadState: jest.fn(), loadGenerationDraft: jest.fn(async () => null), saveGenerationDraft: jest.fn(), clearGenerationDraft: jest.fn(), saveState: jest.fn(), getApiKey: jest.fn(), getGarminPassword: jest.fn(), saveApiKey: jest.fn(), saveGarminPassword: jest.fn() }));
 jest.mock('../src/garmin', () => ({ isConnected: jest.fn(async () => false), disconnect: jest.fn(), pullActivitySummaries: jest.fn(), signIn: jest.fn() }));
 jest.mock('../src/exports', () => ({ shareBackup: jest.fn(), shareExport: jest.fn() }));
 jest.mock('../src/markdown', () => ({ loadBundledMarkdown: jest.fn(), pickMarkdownFile: jest.fn(), pickTextFile: jest.fn() }));
@@ -19,6 +20,7 @@ describe('AT-11,37: completion and reviewed restore', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Restore a plan backup' })).toBeEnabled());
     fireEvent.press(screen.getByRole('button', { name: 'Restore a plan backup' })); await screen.findByText('RESTORE PREVIEW'); expect(saveState).not.toHaveBeenCalled();
     fireEvent.press(screen.getByRole('button', { name: 'Reject' })); expect(saveState).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Restore a plan backup' })).toBeEnabled());
     fireEvent.press(screen.getByRole('button', { name: 'Restore a plan backup' })); await screen.findByText('RESTORE PREVIEW');
     fireEvent.press(screen.getByRole('button', { name: 'Accept and save' }));
     await waitFor(() => expect(saveState).toHaveBeenCalledTimes(1)); const saved = (saveState as jest.Mock).mock.calls[0][0];

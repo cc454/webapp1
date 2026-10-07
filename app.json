@@ -3,11 +3,11 @@
     "name": "Stride AI",
     "slug": "stride-ai",
     "scheme": "stride-ai",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "android": { "package": "com.cc454.strideai", "allowBackup": false, "softwareKeyboardLayoutMode": "resize", "versionCode": 3 },
-    "plugins": ["expo-router", "expo-secure-store", "expo-sqlite", "expo-document-picker"],
+    "android": { "package": "com.cc454.strideai", "allowBackup": false, "softwareKeyboardLayoutMode": "resize", "versionCode": 4 },
+    "plugins": ["expo-router", "expo-secure-store", "expo-sqlite", "expo-document-picker", "./plugins/with-generation-service"],
     "web": { "bundler": "metro", "output": "single" }
   }
 }

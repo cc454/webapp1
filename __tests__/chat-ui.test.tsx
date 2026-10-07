@@ -1,4 +1,5 @@
-jest.mock('../src/storage', () => ({ loadState: jest.fn(), saveState: jest.fn(), getApiKey: jest.fn() }));
+jest.mock('../src/generationBackground', () => ({ withGenerationBackground: (task: () => Promise<unknown>) => task(), generationProgress: jest.fn(), subscribeGeneration: () => () => {}, cancelBackgroundGeneration: jest.fn() }));
+jest.mock('../src/storage', () => ({ loadState: jest.fn(), loadGenerationDraft: jest.fn(async () => null), saveGenerationDraft: jest.fn(), clearGenerationDraft: jest.fn(), saveState: jest.fn(), getApiKey: jest.fn() }));
 jest.mock('../src/garmin', () => ({ isConnected: jest.fn(async () => false) }));
 jest.mock('../src/llm', () => ({ askCoach: jest.fn(), isTruncated: () => false }));
 import React from 'react';
