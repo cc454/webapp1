@@ -110,4 +110,22 @@ describe('AT-07,19–24,40: OpenRouter', () => {
     const proposed=await generatePlan(state,'key');
     expect(proposed.workouts.map(w=>w.date)).toEqual(days); expect(proposed.overview).toHaveLength(27); expect(state.plan).toBeNull(); jest.useRealTimers();
   });
+  it('provides constraints before choosing sessions and repeats them when repairing the reported Monday violation', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-07T12:00:00Z'));
+    const valid=fixturePlan(); valid.start='2026-10-07'; valid.end='2026-10-13'; valid.event.date=valid.end;
+    valid.workouts=valid.workouts.map((w,i)=>({...w,date:addDays(valid.start,i),id:addDays(valid.start,i)}));
+    valid.overview=[{...valid.overview[0]!,start:valid.start,end:valid.end}];
+    const invalid={...valid,workouts:valid.workouts.map(w=>w.date==='2026-10-12'?{...w,long:true,durationSeconds:3600}:w)};
+    const state=emptyState(); state.event=valid.event; state.settings.constraints='guidance: Prefer an easy ride after the long run.';
+    (fetch as jest.Mock).mockResolvedValueOnce(response(JSON.stringify(invalid))).mockResolvedValueOnce(response(JSON.stringify(valid)));
+    const result=await generatePlan(state,'key'); expect(result.workouts.find(w=>w.date==='2026-10-12')).toMatchObject({long:false,durationSeconds:1800}); expect(state.plan).toBeNull();
+    const first=JSON.parse((fetch as jest.Mock).mock.calls[0][1].body), repaired=JSON.parse((fetch as jest.Mock).mock.calls[1][1].body);
+    for(const body of [first,repaired]) {
+      const prompt=body.messages.at(-1).content;
+      expect(prompt).toContain('SCHEDULE CONSTRUCTION CONSTRAINTS'); expect(prompt).toContain('"date":"2026-10-12","weekday":"Monday","maximumTotalDurationSeconds":2400,"longSessionAllowed":false'); expect(prompt).toContain('Prefer an easy ride');
+      expect(body.response_format.json_schema.schema.properties.rules.properties.mondayMaxMinutes.enum).toEqual([40]);
+      expect(body.response_format.json_schema.schema.properties.start.enum).toEqual(['2026-10-07']);
+    }
+    expect(repaired.messages.at(-1).content).toContain('Long session must be on a weekend'); jest.useRealTimers();
+  });
 });

@@ -8,7 +8,9 @@ The owner now confirms Garmin connection/activity import and the chat keyboard/d
 
 The update limits fetched/cached activities to 50, migrates old state without losing chats/settings, fetches VO₂ max/cycling FTP/kg/heart-rate zones, and adds Settings units/timestamps/warnings. Optional endpoint failures retain cached fitness values and do not discard successful activities. Chat renders Markdown, including code and tables, with raw HTML treated as text, safe link protocols, and descriptive image text.
 
-Strict TypeScript, 90 tests across 14 suites, and web export pass. Tests cover a 27-week creation-to-event horizon, complete/incomplete SSE, empty/malformed envelopes, HTTP-200 provider errors, bounded retry recovery/exhaustion, acceptance-before-save, supported Garmin mappings, legacy migration, partial sync, Markdown rendering, and fitness Settings display. Browser inspection confirmed the new fitness section and missing-data labels. Android 0.1.2 build and phone rechecks are recorded below when completed.
+Strict TypeScript and 93 tests across 14 suites pass. Tests cover a 27-week creation-to-event horizon, complete/incomplete SSE, empty/malformed envelopes, HTTP-200 provider errors, bounded retry recovery/exhaustion, acceptance-before-save, supported Garmin mappings, legacy migration, partial sync, Markdown rendering, and fitness Settings display. The first 0.1.2 source update also passed [clean-install CI](https://github.com/cc454/webapp1/actions/runs/37607642075). Browser inspection confirmed the new fitness section and missing-data labels. The first native 0.1.2 build succeeded; the constraint follow-up is being rebuilt for delivery.
+
+The owner supplied the exact remaining validation error: a long session on Monday 2026-10-12 exceeded 40 minutes. Every initial and repair request now starts with a schedule-construction brief: explicit rest quota, permitted long-session weekdays/dates, Monday's total 2,400-second cap, previous-day hard-session restrictions, and the saved additional constraints/guidance. Provider schemas pin batch dates and enforced rule values. A regression reproduces both Monday violations and verifies constraint instructions exist before generation and during repair; final validation and review remain mandatory. Real-model recovery still needs a phone check.
 
 ## Phone feedback and 0.1.1 fixes
 
@@ -47,7 +49,7 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-10 | Plan screen fields implemented; representative device review pending. |
 | AT-11 | restore-ui.test.tsx verifies completion persistence from rendered controls. |
 | AT-12 | Overview validation implemented; long/partial plan rendering review pending. |
-| AT-13 | constraints.test.ts and plan.test.ts verify supported rules, conflict detection, and final partial-block policy. |
+| AT-13 | constraints.test.ts and plan.test.ts verify supported rules, conflict detection, partial-block policy, and date-specific construction limits. llm.test.ts reproduces the reported Monday long-session/40-minute failure and verifies explicit initial/repair instructions and schema-pinned dates/rules. |
 | AT-14 | app.test.tsx verifies no save before acceptance and duplicate generation prevention. |
 | AT-15 | plan.test.ts verifies diffs, invalid plans, and preserved completed history. |
 | AT-16 | storage.test.ts covers SQL-bound state and corruption; actual SQLite restart check pending. |
