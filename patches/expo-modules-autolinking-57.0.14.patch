@@ -1,0 +1,13 @@
+diff --git a/android/expo-gradle-plugin/expo-autolinking-plugin-shared/src/main/kotlin/expo/modules/plugin/Os.kt b/android/expo-gradle-plugin/expo-autolinking-plugin-shared/src/main/kotlin/expo/modules/plugin/Os.kt
+--- a/android/expo-gradle-plugin/expo-autolinking-plugin-shared/src/main/kotlin/expo/modules/plugin/Os.kt
++++ b/android/expo-gradle-plugin/expo-autolinking-plugin-shared/src/main/kotlin/expo/modules/plugin/Os.kt
+@@ -7,7 +7,4 @@
+   fun windowsAwareCommandLine(args: List<String>): List<String> =
+-    if (isWindows()) {
+-      listOf("cmd", "/c") + args
+-    } else {
+-      args
+-    }
++    // The caller executes node.exe directly; cmd /c breaks eval arguments on Windows.
++    args
+ }

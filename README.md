@@ -1,45 +1,75 @@
 # Stride AI
 
-Stride AI is a planned local-first personal Android trainer for running and cycling. AI generates a flexible plan from creation through the event date. All initial plans and proposed changes require review and acceptance before becoming active.
+A local-first personal trainer for running and cycling, built with Expo, React Native, and TypeScript. Plans run from creation through your event date. Initial plans and revisions remain proposals until you review and accept them.
 
-## Status
+## Implementation status
 
-The repository contains TypeScript modules, training content, and test scaffolds. It is not yet runnable: App.tsx, dependency manifest, Expo/test configuration, and Android build setup must be restored or created. There are currently no verified install/start/build commands. Documentation describes target behavior rather than completed features.
+The app now includes Plan, Chat, and Settings; goal/guidance imports; rolling seven-day views; plan validation and review; OpenRouter coaching; ten conversation threads; SQLite persistence on Android; exports; and versioned plan backup/restore. A browser preview uses local browser storage and memory-only API keys.
 
-- [Requirements and matching acceptance cases](REQUIREMENTS.md)
-- [Development milestones](DEVELOPMENT_PLAN.md)
+Strict type checking and 61 automated tests passed after the reboot on 7 October 2026. Web and Android JavaScript exports have compiled. Native APK packaging is being verified separately; see [verification status](TESTING.md).
 
-## Intended experience
+Garmin sign-in and sync are implemented behind an isolated native adapter but have **not been verified with a real account/device**. The current adapter fetches up to 100 recent running/cycling summaries, including optional HR, speed, elevation, power, and cadence. Lap detail, zones, fitness/load, and recovery endpoints are not implemented yet. Missing metrics remain unknown. Garmin workout push is deferred. Native iOS and Ona are out of scope.
 
-- Personal Android use, English, metric units, and minimalist dark styling.
-- Today plus six days of workouts and a full overview through the event date.
-- OpenRouter with a securely stored user-supplied API key and selectable model and reviewable plan proposals.
-- On-demand Garmin activity/athlete sync using available metrics.
-- Ten retained chat threads, manual completion, Markdown/PDF/calendar exports, and current-plan backup/restore.
-- Optional browser access and Garmin workout/calendar push.
+## Development
 
-App state stays local. Coaching sends selected context through OpenRouter to the selected downstream model provider. Garmin communication is separate; Garmin secrets never belong in coaching or backups. Cross-device synchronization is not specified.
+Use Node 24 and pnpm 11.19.0. Dependency versions and the Windows native-tooling patch are recorded in the lockfile.
 
-## Training content
-
-The authoritative files are [goal.md](training/goal.md), [research.md](training/research.md), and [constraints.md](training/constraints.md). Planned behavior includes bundled loading, device import, and local research/constraints editing.
-
-Goal fields are name, date, distance, target time, and elevation. Time is hours:minutes, optionally hours:minutes:seconds. Calculate pace from time/distance; a legacy pace field cannot override it.
-
-The current goal is Halbmarathon on 11 April 2027, updated by the owner. Its 21.1 km / 2:00 target calculates to approximately 5:41/km, superseding the supplied 5:30/km.
-
-## Development and delivery
-
-Restore the Android foundation, then verify native Garmin authentication and retrievable metrics using the owner's account. Implement or execute each acceptance case in REQUIREMENTS.md, using automated tests for logic and Android checks for native behavior. Existing mocked tests do not establish Garmin compatibility.
-
-The eventual reproducible build must be independent of Ona and output artifacts/stride-ai-release.apk. Document prerequisites, commands, and signing after verification. Ona and native iOS delivery are out of scope. Verify native-cookie compatibility with the chosen Expo workflow before publishing setup instructions.
-
-## Source layout
-
-```text
-src/                       Data, storage, coaching, Garmin, imports, exports
-__tests__/                 Existing test scaffolds
-training/                  Goal and coaching guidance
-REQUIREMENTS.md            Required/optional behavior and acceptance cases
-DEVELOPMENT_PLAN.md         Milestones and acceptance gates
+```powershell
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm test
+pnpm web
 ```
+
+For Android development, use a development build rather than Expo Go because the Garmin cookie adapter requires native code:
+
+```powershell
+pnpm android
+pnpm start
+```
+
+The Android run command needs a configured SDK/JDK and an emulator or USB-debugging-enabled phone. The build script below discovers the workspace-local tools automatically.
+
+## Build the Android APK on Windows
+
+Install JDK 17 and Android SDK and set JAVA_HOME / ANDROID_HOME, or use the workspace-local setup:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/bootstrap-android.ps1
+pnpm build:android
+```
+
+The bootstrap script downloads the JDK and Google command-line tools into ignored `.tools/` and prompts for SDK license review. Use `-AcceptLicenses` only after explicitly authorizing acceptance. The build runs in the workspace and outputs `artifacts/stride-ai-release.apk`.
+
+The generated release variant uses the template debug certificate for personal testing only. Keep the same signing identity when upgrading; do not uninstall first if you want to preserve data. Production distribution needs a private release keystore. APK installation/upgrade on the owner's phone remains a separate acceptance check.
+
+## First use
+
+1. In Settings, load the project goal, research, and constraints, or import your own .md/.txt files.
+2. Configure an OpenRouter model and API key, then save settings. Native keys are stored in SecureStore. The default model is anthropic/claude-sonnet-4.6; generation requires structured-output support.
+3. Save Garmin email/password, connect, and sync activities on Android. An error leaves the cache intact; a session error requires reauthentication.
+4. Generate your plan from Plan. Longer plans are generated in seven-day batches; progress and cancellation are available. No partial plan is activated. Review the proposed sessions before accepting.
+5. Use Chat for advice. To change the plan, enter a request and select Propose plan changes, then review it on Plan.
+6. Back up the current plan before clearing it or changing events. Restore previews a JSON backup before replacing the active plan.
+
+Ten chats means ten conversation threads ordered by recent use. The oldest is removed when a new thread would exceed ten. Workout completion is manual.
+
+## Goal and scheduling rules
+
+The bundled [goal.md](training/goal.md) specifies Halbmarathon on 11 April 2027. Required fields are name, date, distance in km, target time as H:MM (optional seconds), and elevation in m. Pace is calculated: 21.1 km in 2:00 is approximately 5:41/km; legacy pace text is ignored.
+
+The enforced scheduling controls are minimum rest days, Monday maximum duration, weekend long sessions, and no consecutive hard days. Rest quotas apply to full seven-day blocks anchored at plan creation; the final partial block has no prorated quota. Daily rules still apply.
+
+The four bundled constraints are recognized and checked against those controls. Unrecognized scheduling prose blocks generation until resolved. Prefix advisory text with `guidance:` if it is meant for the coach rather than deterministic enforcement. Changing rules does not silently revise the active plan.
+
+## Privacy and portability
+
+Plan, guidance, activities, and chats stay on the device. Coaching sends selected context through OpenRouter to the selected downstream provider. Garmin credentials are excluded from coaching, logs, and backups. Plan backups include event, dates, overview, sessions, and completion; they exclude credentials and chat history. Restore preserves current device settings and chats.
+
+Browser storage is local to that browser; there is no cross-device sync. Browser API keys are held in memory and must be re-entered after reload. Garmin is Android-only. The browser PDF export opens the print/save-as-PDF dialog.
+
+## References
+
+- [Requirements and acceptance cases](REQUIREMENTS.md)
+- [Development plan](DEVELOPMENT_PLAN.md)
+- [Verification evidence and remaining device checks](TESTING.md)

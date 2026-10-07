@@ -1,39 +1,20 @@
-jest.mock("expo-file-system", () => ({ cacheDirectory: "file://cache/", writeAsStringAsync: jest.fn() }));
-jest.mock("expo-print", () => ({ printToFileAsync: jest.fn() }));
-jest.mock("expo-sharing", () => ({ isAvailableAsync: jest.fn(), shareAsync: jest.fn() }));
-
-import * as FileSystem from "expo-file-system";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
-import { shareExport } from "../src/exports";
-
-const mockFileSystem = FileSystem as jest.Mocked<typeof FileSystem>;
-const mockPrint = Print as jest.Mocked<typeof Print>;
-const mockSharing = Sharing as jest.Mocked<typeof Sharing>;
-
-const event = { name: "Race / 50K", date: "Oct 10", distance: "50 km", targetTime: "6:00", elevation: "2,000 m", pace: "7:12" };
-const workouts = [{ id: "mon", date: "MON · AUG 17", title: "Easy", detail: "Rest\nRecover", duration: "30 min", type: "run" as const }];
-
-describe("plan exports", () => {
-  beforeEach(() => { jest.clearAllMocks(); mockSharing.isAvailableAsync.mockResolvedValue(true); });
-
-  it("writes and shares a safely named Markdown export", async () => {
-    await shareExport("md", event, workouts);
-    expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalledWith("file://cache/Race - 50K-training-plan.md", expect.stringContaining("# Race / 50K Training Plan"));
-    expect(mockSharing.shareAsync).toHaveBeenCalledWith("file://cache/Race - 50K-training-plan.md", { mimeType: undefined });
+import { ics, markdown, pdfHtml, safeFilename } from '../src/exportContent';
+import { fixturePlan, session } from './fixtures';
+describe('AT-33–34: export content', () => {
+  it('uses stored dates across year boundaries, stable IDs, and escaped text', () => {
+    const plan = fixturePlan(); const w = session('2026-12-31'); w.title = 'Ride, then; rest'; w.detail = 'First\nSecond';
+    const text = ics(plan.event, [w], new Date('2026-12-30T12:00:00Z'));
+    expect(text).toContain('DTSTART;VALUE=DATE:20261231'); expect(text).toContain('Ride\\, then\\; rest'); expect(text).toContain('First\\nSecond');
+    expect(text).toContain('DTSTAMP:20261230T120000Z'); expect(text).toContain('END:VCALENDAR\r\n');
+    expect(text.match(/UID:.*/)?.[0]).toBe(ics(plan.event, [w]).match(/UID:.*/)?.[0]);
   });
-
-  it("writes an iCalendar export with a calendar MIME type", async () => {
-    await shareExport("ics", event, workouts);
-    expect(mockFileSystem.writeAsStringAsync).toHaveBeenCalledWith(expect.stringContaining(".ics"), expect.stringContaining("BEGIN:VCALENDAR"));
-    expect(mockSharing.shareAsync).toHaveBeenCalledWith(expect.stringContaining(".ics"), { mimeType: "text/calendar" });
+  it('escapes HTML and creates safe filenames', () => {
+    const plan = fixturePlan(); plan.event.name = '<script>bad</script> / Race';
+    expect(pdfHtml(plan.event, plan.workouts)).not.toContain('<script>'); expect(pdfHtml(plan.event, plan.workouts)).toContain('&lt;script&gt;');
+    expect(safeFilename('../Race/:*?')).not.toMatch(/[/:*?]/); expect(markdown(plan.event, plan.workouts)).toContain('2027-04-05');
   });
-
-  it("creates a PDF and does not share when unavailable", async () => {
-    mockPrint.printToFileAsync.mockResolvedValue({ uri: "file://plan.pdf" } as any);
-    mockSharing.isAvailableAsync.mockResolvedValue(false);
-    await shareExport("pdf", event, workouts);
-    expect(mockPrint.printToFileAsync).toHaveBeenCalledWith(expect.objectContaining({ html: expect.stringContaining("Race / 50K") }));
-    expect(mockSharing.shareAsync).not.toHaveBeenCalled();
+  it('folds long unicode lines to at most 75 UTF-8 bytes', () => {
+    const plan = fixturePlan(); plan.workouts[0]!.detail = 'é😊'.repeat(100);
+    for (const line of ics(plan.event, plan.workouts).split('\r\n')) expect(Buffer.byteLength(line)).toBeLessThanOrEqual(75);
   });
 });

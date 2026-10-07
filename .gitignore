@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+web-dist/
+coverage/
+android/
+artifacts/
+.tools/
+.env*
+*.keystore
+*.jks
+*.log

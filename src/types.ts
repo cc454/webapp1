@@ -1,37 +1,57 @@
-export type Workout = {
-  id: string;
-  date: string;
-  title: string;
-  detail: string;
-  duration: string;
-  type: "run" | "strength" | "rest" | "cross";
-  completed?: boolean;
-};
+import { z } from 'zod';
 
-export type EventDetails = {
-  name: string;
-  date: string;
-  distance: string;
-  targetTime: string;
-  elevation: string;
-  pace: string;
-};
-
-export type AppSettings = {
-  provider: "anthropic" | "gemini";
-  research: string;
-  constraints: string;
-  garminEmail: string;
-};
-
-export type MacroWeek = { week: number; phase: string; volume: string; focus: string };
-
-export type GarminActivitySummary = {
-  id: number;
-  name: string;
-  startedAt: string;
-  distanceKm: number;
-  durationMinutes: number;
-  averageHeartRate?: number;
-  averagePace?: string;
-};
+export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
+  const d = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}, 'Invalid calendar date');
+export const eventSchema = z.object({
+  name: z.string().trim().min(1), date: isoDate, distanceKm: z.number().positive(),
+  targetSeconds: z.number().int().positive(), elevationM: z.number().nonnegative(),
+});
+export const stepSchema = z.object({
+  kind: z.enum(['warmup', 'work', 'recovery', 'cooldown']),
+  seconds: z.number().int().positive(), repeats: z.number().int().min(1).max(100),
+  target: z.string().max(300),
+});
+export const workoutSchema = z.object({
+  id: z.string().min(1), date: isoDate, title: z.string().min(1).max(200),
+  detail: z.string().max(3000), sport: z.enum(['run', 'ride', 'rest']),
+  durationSeconds: z.number().int().nonnegative(), distanceKm: z.number().nonnegative(),
+  intensity: z.enum(['easy', 'hard', 'rest']), long: z.boolean(),
+  completed: z.boolean(), steps: z.array(stepSchema).max(100),
+});
+export const overviewSchema = z.object({
+  start: isoDate, end: isoDate, phase: z.string().min(1), focus: z.string().min(1),
+  runningKm: z.number().nonnegative(), cyclingKm: z.number().nonnegative(),
+});
+export const rulesSchema = z.object({
+  restDays: z.number().int().min(0).max(7), mondayMaxMinutes: z.number().int().nonnegative(),
+  weekendLong: z.boolean(), noConsecutiveHard: z.boolean(),
+});
+export const planSchema = z.object({
+  version: z.literal(1), revision: z.number().int().min(1), event: eventSchema,
+  start: isoDate, end: isoDate, rules: rulesSchema,
+  workouts: z.array(workoutSchema).max(10000), overview: z.array(overviewSchema).min(1).max(1000),
+});
+export const activitySchema = z.object({
+  id: z.number().int(), sport: z.enum(['run', 'ride']), name: z.string(), startedAt: z.string(),
+  distanceKm: z.number().nonnegative(), durationSeconds: z.number().nonnegative(),
+  averageHeartRate: z.number().optional(), speedKmh: z.number().optional(),
+  elevationM: z.number().optional(), powerW: z.number().optional(), cadence: z.number().optional(),
+});
+export const messageSchema = z.object({ role: z.enum(['user', 'assistant']), content: z.string(), at: z.string() });
+export const threadSchema = z.object({ id: z.string(), title: z.string(), updatedAt: z.string(), messages: z.array(messageSchema) });
+export const stateSchema = z.object({
+  version: z.literal(1), event: eventSchema.nullable(), plan: planSchema.nullable(),
+  settings: z.object({ model: z.string().min(1), research: z.string(), constraints: z.string(), garminEmail: z.string(), rules: rulesSchema }),
+  activities: z.array(activitySchema), lastSync: z.string().nullable(), threads: z.array(threadSchema).max(10),
+});
+export type EventDetails = z.infer<typeof eventSchema>;
+export type Workout = z.infer<typeof workoutSchema>;
+export type Plan = z.infer<typeof planSchema>;
+export type Rules = z.infer<typeof rulesSchema>;
+export type GarminActivitySummary = z.infer<typeof activitySchema>;
+export type ChatThread = z.infer<typeof threadSchema>;
+export type Message = z.infer<typeof messageSchema>;
+export type AppState = z.infer<typeof stateSchema>;
+export type AppSettings = AppState['settings'];

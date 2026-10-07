@@ -1,104 +1,91 @@
-import CookieManager from "@react-native-cookies/cookies";
-import { GarminActivitySummary, Workout } from "./types";
-import { clearGarminSession, getGarminSession, saveGarminSession } from "./storage";
-
-const CONNECT = "https://connect.garmin.com";
-const SSO = "https://sso.garmin.com/sso";
-const USER_AGENT = "Mozilla/5.0 (Mobile; Stride AI)";
-
-export class GarminError extends Error {}
-
-/**
- * Garmin Connect does not publish this consumer workflow as a stable API.
- * Keep every endpoint in this adapter so it can be updated without touching
- * coaching or UI code when Garmin changes its web client.
- */
+import CookieManager from '@preeternal/react-native-cookie-manager';
+import { z } from 'zod';
+import { GarminActivitySummary } from './types';
+import { clearGarminSession, getGarminSession, saveGarminSession } from './storage';
+const CONNECT = 'https://connect.garmin.com';
+const SSO = 'https://sso.garmin.com/sso';
+export class GarminError extends Error { }
 async function request(path: string, init: RequestInit = {}) {
-  const response = await fetch(`${CONNECT}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: { accept: "application/json", "user-agent": USER_AGENT, ...init.headers },
-  });
-  if (response.status === 401 || response.status === 403) {
-    await clearGarminSession();
-    throw new GarminError("Garmin session expired. Sign in again in Settings.");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(`${CONNECT}${path}`, { ...init, credentials: 'include', signal: controller.signal, headers: { accept: 'application/json', ...init.headers } });
+    if (response.status === 401 || response.status === 403) {
+      await disconnect(); throw new GarminError('Garmin session expired. Sign in again in Settings.');
+    }
+    if (!response.ok) throw new GarminError(`Garmin request failed (${response.status}). Cached data was retained.`);
+    return response;
+  } catch (error) {
+    if (controller.signal.aborted) throw new GarminError('Garmin timed out. Cached data was retained.');
+    if (error instanceof TypeError) throw new GarminError('Unable to reach Garmin. Check your connection.');
+    throw error;
+  } finally { clearTimeout(timer); }
+}
+export async function disconnect() {
+  await CookieManager.clearAll();
+  await clearGarminSession();
+}
+function input(html: string, name: string) {
+  for (const tag of html.match(/<input\b[^>]*>/gi) ?? []) {
+    if (new RegExp(`name=["']${name}["']`, 'i').test(tag)) return tag.match(/value=["']([^"']*)/i)?.[1];
   }
-  if (!response.ok) throw new GarminError(`Garmin request failed (${response.status}).`);
-  return response;
+  return undefined;
 }
-
-function hiddenInput(html: string, name: string) {
-  const pattern = new RegExp(`<input[^>]+name=["']${name}["'][^>]+value=["']([^"']*)`, "i");
-  return html.match(pattern)?.[1] ?? "";
-}
-
-/** Establishes the web session used by Garmin Connect in the native cookie jar. */
+// Consumer web-session adapter: endpoints require physical-device feasibility testing.
 export async function signIn(email: string, password: string) {
-  if (!email || !password) throw new GarminError("Enter your Garmin email and password first.");
-  const signInUrl = `${SSO}/signin?service=${encodeURIComponent(`${CONNECT}/modern/`)}&webhost=${encodeURIComponent(`${CONNECT}/modern/`)}&source=${encodeURIComponent(`${CONNECT}/signin/`)}&redirectAfterAccountLoginUrl=${encodeURIComponent(`${CONNECT}/modern/`)}&locale=en`;
-  const page = await fetch(signInUrl, { headers: { "user-agent": USER_AGENT } });
-  if (!page.ok) throw new GarminError("Could not open Garmin sign-in.");
-  const html = await page.text();
-  const form = new URLSearchParams({
-    username: email,
-    password,
-    _csrf: hiddenInput(html, "_csrf"),
-    embed: "true",
-  });
-  const response = await fetch(signInUrl, { method: "POST", credentials: "include", headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": USER_AGENT }, body: form.toString(), redirect: "follow" });
-  const body = await response.text();
-  if (!response.ok || /invalid.*(username|password)|incorrect.*password/i.test(body)) throw new GarminError("Garmin rejected those credentials.");
-  const cookies = await CookieManager.get(CONNECT);
-  if (!Object.keys(cookies).length) throw new GarminError("Garmin sign-in did not create a device session. Garmin may have changed its sign-in flow.");
-  await saveGarminSession(JSON.stringify({ signedInAt: new Date().toISOString() }));
+  if (!email.trim() || !password) throw new GarminError('Enter your Garmin email and password first.');
+  await disconnect();
+  const url = `${SSO}/signin?service=${encodeURIComponent(`${CONNECT}/modern/`)}&webhost=${encodeURIComponent(`${CONNECT}/modern/`)}&source=${encodeURIComponent(`${CONNECT}/signin/`)}&redirectAfterAccountLoginUrl=${encodeURIComponent(`${CONNECT}/modern/`)}&locale=en`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const page = await fetch(url, { credentials: 'include', signal: controller.signal });
+    if (!page.ok) throw new GarminError('Could not open Garmin sign-in.');
+    const csrf = input(await page.text(), '_csrf');
+    if (!csrf) throw new GarminError('Garmin sign-in has changed. The native adapter needs updating.');
+    const form = new URLSearchParams({ username: email.trim(), password, _csrf: csrf, embed: 'true' });
+    const response = await fetch(url, { method: 'POST', credentials: 'include', signal: controller.signal, headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form.toString(), redirect: 'follow' });
+    const html = await response.text();
+    if (!response.ok || /invalid.*(username|password)|incorrect.*password/i.test(html)) throw new GarminError('Garmin rejected those credentials.');
+    if (/multi.factor|verification code|one.time code/i.test(html)) throw new GarminError('This Garmin sign-in requires additional verification, which this adapter does not support yet.');
+    await CookieManager.flush();
+    // A cookie alone is insufficient: prove access to the authenticated activity endpoint.
+    await pullActivitySummaries(1);
+    await saveGarminSession(JSON.stringify({ signedInAt: new Date().toISOString() }));
+  } catch (error) {
+    await disconnect();
+    if (controller.signal.aborted) throw new GarminError('Garmin sign-in timed out.');
+    throw error;
+  } finally { clearTimeout(timer); }
 }
-
 export async function isConnected() { return Boolean(await getGarminSession()); }
-
-export async function pullActivitySummaries(limit = 8): Promise<GarminActivitySummary[]> {
-  const response = await request(`/modern/proxy/activitylist-service/activities/search/activities?start=0&limit=${limit}`);
-  const activities = await response.json();
-  return activities.map((activity: any) => ({
-    id: activity.activityId,
-    name: activity.activityName ?? activity.activityType?.typeKey ?? "Activity",
-    startedAt: activity.startTimeLocal,
-    distanceKm: Math.round(((activity.distance ?? 0) / 1000) * 100) / 100,
-    durationMinutes: Math.round((activity.duration ?? 0) / 60),
-    averageHeartRate: activity.averageHR ? Math.round(activity.averageHR) : undefined,
-    averagePace: activity.averageSpeed ? `${Math.floor(1000 / activity.averageSpeed / 60)}:${String(Math.round(1000 / activity.averageSpeed) % 60).padStart(2, "0")} / km` : undefined,
-  }));
-}
-
-function dateFromWorkout(workout: Workout) {
-  const match = workout.date.match(/AUG (\d{1,2})/);
-  return `2026-08-${String(match ? Number(match[1]) : 17).padStart(2, "0")}`;
-}
-
-function workoutPayload(workout: Workout) {
-  return {
-    workoutName: `Stride AI · ${workout.title}`,
-    description: workout.detail,
-    sportType: { sportTypeId: 1, sportTypeKey: "running" },
-    workoutSegments: [{ segmentOrder: 1, sportType: { sportTypeId: 1, sportTypeKey: "running" }, workoutSteps: [{ type: "ExecutableStepDTO", stepOrder: 1, stepType: { stepTypeId: 3, stepTypeKey: "interval" }, endCondition: { conditionTypeId: 2, conditionTypeKey: "time" }, endConditionValue: Math.max(60, parseDuration(workout.duration)), description: workout.detail }] }],
-  };
-}
-
-function parseDuration(value: string) {
-  const h = value.match(/(\d+)h/)?.[1]; const m = value.match(/(\d+)\s*min/)?.[1];
-  return (Number(h ?? 0) * 3600) + (Number(m ?? 0) * 60) || 1800;
-}
-
-/** Creates Garmin workouts then schedules each workout on the Garmin calendar. */
-export async function pushWeekToCalendar(workouts: Workout[]) {
-  const active = workouts.filter(w => w.type !== "rest");
-  let pushed = 0;
-  for (const workout of active) {
-    const created = await request("/modern/proxy/workout-service/workout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(workoutPayload(workout)) });
-    const saved = await created.json();
-    const workoutId = saved.workoutId ?? saved.workout?.workoutId;
-    if (!workoutId) throw new GarminError("Garmin did not return a workout ID.");
-    await request("/modern/proxy/calendar-service/calendar/entries", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ date: dateFromWorkout(workout), workoutId, calendarEventType: "workout" }) });
-    pushed += 1;
+const rawActivity = z.object({
+  activityId: z.number().int(), activityName: z.string().optional(), activityType: z.object({ typeKey: z.string() }),
+  startTimeLocal: z.string(), distance: z.number().nonnegative(), duration: z.number().nonnegative(),
+  averageHR: z.number().nullish(), averageSpeed: z.number().nullish(), elevationGain: z.number().nullish(),
+  avgPower: z.number().nullish(), averageBikingCadenceInRevPerMinute: z.number().nullish(), averageRunningCadenceInStepsPerMinute: z.number().nullish(),
+});
+export function mapActivities(value: unknown): GarminActivitySummary[] {
+  const parsed = z.array(rawActivity).safeParse(value);
+  if (!parsed.success) throw new GarminError('Garmin returned invalid activity data. Cached data was retained.');
+  const unique = new Map<number, GarminActivitySummary>();
+  for (const a of parsed.data) {
+    const type = a.activityType.typeKey;
+    const sport = /running/.test(type) ? 'run' : /cycling|biking/.test(type) ? 'ride' : null;
+    if (!sport) continue;
+    unique.set(a.activityId, { id: a.activityId, sport, name: a.activityName ?? type, startedAt: a.startTimeLocal,
+      distanceKm: a.distance / 1000, durationSeconds: a.duration,
+      ...(a.averageHR ? { averageHeartRate: a.averageHR } : {}),
+      ...(a.averageSpeed ? { speedKmh: a.averageSpeed * 3.6 } : {}),
+      ...(a.elevationGain != null ? { elevationM: a.elevationGain } : {}),
+      ...(a.avgPower != null ? { powerW: a.avgPower } : {}),
+      ...((a.averageBikingCadenceInRevPerMinute ?? a.averageRunningCadenceInStepsPerMinute) != null ? { cadence: (a.averageBikingCadenceInRevPerMinute ?? a.averageRunningCadenceInStepsPerMinute)! } : {}),
+    });
   }
-  return pushed;
+  return [...unique.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+}
+export async function pullActivitySummaries(limit = 100) {
+  const response = await request(`/modern/proxy/activitylist-service/activities/search/activities?start=0&limit=${Math.min(200, Math.max(1, limit))}`);
+  try { return mapActivities(await response.json()); }
+  catch (error) { if (error instanceof GarminError) throw error; throw new GarminError('Garmin returned unreadable activity data. Cached data was retained.'); }
 }

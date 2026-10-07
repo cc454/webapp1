@@ -8,6 +8,8 @@ Personal Android app for running/cycling; AI generates a plan from creation thro
 
 ## Baseline
 
+Implementation checkpoint, 7 October 2026: the runnable Expo foundation, strict schemas, local persistence, OpenRouter proposal/review flow, chat retention, imports, exports, backups, and native Garmin adapter are now implemented. Sixty-one tests and strict checking passed after the reboot. Native APK packaging and real-account/device acceptance remain open. TESTING.md records evidence by acceptance ID. The following baseline describes the starting repository, not the current state.
+
 Modules and tests exist, but App.tsx, dependency manifest, Expo/TypeScript/test configuration, and build setup are missing. Asset imports target assets/training while files live in training. Plans/calendar dates are hardcoded. Coaching cannot apply reviewed revisions. Garmin sport/interval mapping, durations, and retries need work.
 
 The authoritative goal is the half marathon in training/goal.md, updated by the owner to 11 April 2027. Calculate pace from distance/time rather than the legacy pace field.
