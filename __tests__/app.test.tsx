@@ -1,5 +1,5 @@
 jest.mock('../src/storage', () => ({ loadState: jest.fn(), saveState: jest.fn(), getApiKey: jest.fn(), getGarminPassword: jest.fn(), saveApiKey: jest.fn(), saveGarminPassword: jest.fn() }));
-jest.mock('../src/garmin', () => ({ isConnected: jest.fn(async () => false), disconnect: jest.fn(), pullActivitySummaries: jest.fn(), signIn: jest.fn() }));
+jest.mock('../src/garmin', () => ({ isConnected: jest.fn(async () => false), disconnect: jest.fn(), pullActivitySummaries: jest.fn(), pullFitness: jest.fn(), signIn: jest.fn() }));
 jest.mock('../src/exports', () => ({ shareBackup: jest.fn(), shareExport: jest.fn() }));
 jest.mock('../src/markdown', () => ({ loadBundledMarkdown: jest.fn(), pickMarkdownFile: jest.fn(), pickTextFile: jest.fn() }));
 jest.mock('../src/llm', () => ({ generatePlan: jest.fn(), askCoach: jest.fn(), isTruncated: () => false }));
@@ -10,6 +10,9 @@ import { loadState, saveState } from '../src/storage';
 import { generatePlan } from '../src/llm';
 import { emptyState } from '../src/defaults';
 import { fixturePlan } from './fixtures';
+import { isConnected, pullActivitySummaries, pullFitness } from '../src/garmin';
+import { AppProvider } from '../src/appContext';
+import { SettingsScreen } from '../src/screens';
 describe('AT-14,32,38: rendered app flows', () => {
   beforeEach(() => { (saveState as jest.Mock).mockResolvedValue(undefined); });
   it('renders empty onboarding without saving on startup', async () => {
@@ -31,5 +34,16 @@ describe('AT-14,32,38: rendered app flows', () => {
   it('shows recovery without overwriting corrupt state', async () => {
     (loadState as jest.Mock).mockRejectedValue(new Error('Damaged data')); render(<App />);
     await screen.findByText('Damaged data'); expect(saveState).not.toHaveBeenCalled();
+  });
+  it('saves successful activities even if optional fitness refresh has a warning', async () => {
+    const state=emptyState(); (loadState as jest.Mock).mockResolvedValue(state);
+    (isConnected as jest.Mock).mockResolvedValue(true);
+    (pullActivitySummaries as jest.Mock).mockResolvedValue([{id:1,sport:'run',name:'Easy run',startedAt:'2026-10-06',distanceKm:5,durationSeconds:1800}]);
+    (pullFitness as jest.Mock).mockResolvedValue({...state.fitness,warnings:['Heart-rate zone refresh failed; any cached value is retained.']});
+    render(<AppProvider><SettingsScreen /></AppProvider>);
+    const button=await screen.findByRole('button',{name:'Sync activities'}); await waitFor(()=>expect(button).toBeEnabled()); fireEvent.press(button);
+    await screen.findByText('1 cached running/cycling activities');
+    expect(screen.getByText('Heart-rate zone refresh failed; any cached value is retained.')).toBeTruthy();
+    const saved=(saveState as jest.Mock).mock.calls.at(-1)[0]; expect(saved.activities).toHaveLength(1); expect(saved.lastSync).toBeTruthy();
   });
 });

@@ -41,10 +41,19 @@ export const activitySchema = z.object({
 });
 export const messageSchema = z.object({ role: z.enum(['user', 'assistant']), content: z.string(), at: z.string() });
 export const threadSchema = z.object({ id: z.string(), title: z.string(), updatedAt: z.string(), messages: z.array(messageSchema) });
+export const fitnessSchema = z.object({
+  vo2: z.object({ running: z.number().positive().nullable(), cycling: z.number().positive().nullable(), fetchedAt: z.string() }).nullable(),
+  power: z.object({ ftpW: z.number().positive().nullable(), wattsPerKg: z.number().positive().nullable(), date: z.string().nullable(), fetchedAt: z.string() }).nullable(),
+  zones: z.object({ profiles: z.array(z.object({ sport: z.string(), maxHeartRate: z.number().positive().nullable(), floors: z.array(z.number().positive()).length(5) })), fetchedAt: z.string() }).nullable(),
+  warnings: z.array(z.string()),
+});
+export type GarminFitness = z.infer<typeof fitnessSchema>;
 export const stateSchema = z.object({
   version: z.literal(1), event: eventSchema.nullable(), plan: planSchema.nullable(),
   settings: z.object({ model: z.string().min(1), research: z.string(), constraints: z.string(), garminEmail: z.string(), rules: rulesSchema }),
-  activities: z.array(activitySchema), lastSync: z.string().nullable(), threads: z.array(threadSchema).max(10),
+  activities: z.array(activitySchema).transform(items => [...items].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 50)),
+  fitness: fitnessSchema.default({ vo2: null, power: null, zones: null, warnings: [] }),
+  lastSync: z.string().nullable(), threads: z.array(threadSchema).max(10),
 });
 export type EventDetails = z.infer<typeof eventSchema>;
 export type Workout = z.infer<typeof workoutSchema>;

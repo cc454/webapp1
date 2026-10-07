@@ -2,6 +2,14 @@
 
 Updated 7 October 2026 after recovery from a reboot. Passing automated cases are evidence for the named logic, not proof of native device behavior or real-service compatibility.
 
+## Phone feedback and 0.1.2 update
+
+The owner now confirms Garmin connection/activity import and the chat keyboard/draft behavior work. Live chat remains functional; plan generation reports “JSON Parse error: Unexpected end of input.” This originates outside the weekly plan JSON-validation handler in the transport envelope parser. Empty/truncated envelopes are now translated into useful errors; plan requests use SSE keep-alives and a bounded transport retry, rejecting unfinished streams and HTTP-200 provider errors. This fixes the unhandled parse-error path; the exact cause of the owner's truncated response and live generation recovery still need a phone recheck.
+
+The update limits fetched/cached activities to 50, migrates old state without losing chats/settings, fetches VO₂ max/cycling FTP/kg/heart-rate zones, and adds Settings units/timestamps/warnings. Optional endpoint failures retain cached fitness values and do not discard successful activities. Chat renders Markdown, including code and tables, with raw HTML treated as text, safe link protocols, and descriptive image text.
+
+Strict TypeScript, 90 tests across 14 suites, and web export pass. Tests cover a 27-week creation-to-event horizon, complete/incomplete SSE, empty/malformed envelopes, HTTP-200 provider errors, bounded retry recovery/exhaustion, acceptance-before-save, supported Garmin mappings, legacy migration, partial sync, Markdown rendering, and fitness Settings display. Browser inspection confirmed the new fitness section and missing-data labels. Android 0.1.2 build and phone rechecks are recorded below when completed.
+
 ## Phone feedback and 0.1.1 fixes
 
 The owner confirmed 0.1.0 installs/launches, OpenRouter and chat work with `anthropic/claude-sonnet-4.6`, and Markdown loading works. Garmin failed with “Garmin returned unreadable activity data”; full plan generation produced no visible feedback. Keyboard avoidance, draft clearing, and large settings fields were also reported.
@@ -17,7 +25,7 @@ The 0.1.1 update replaces the web-cookie Garmin transport with mobile token auth
 - Android JavaScript/Hermes export: compiled before reboot.
 - Android prebuild and native APK packaging: passed for 0.1.0 and 0.1.1. `apksigner verify --print-certs` passed; package `com.cc454.strideai`, version 0.1.1, target API 36, ARM64/ARMv7. The owner confirmed 0.1.0 installation; the 0.1.1 upgrade needs retesting.
 - Browser UI: goal loading, calculated 5:41/km pace, navigation, no-key generation error, and reload persistence were verified before reboot.
-- The owner verified live OpenRouter chat and Markdown loading on their phone. Garmin login/sync failed in 0.1.0; the replacement adapter needs account retesting. No Android device is connected to this build host.
+- The owner verified live OpenRouter chat, Markdown loading, Garmin login/activity sync, and keyboard/draft behavior on their phone. The 0.1.2 fitness values and full plan generation still need a phone recheck. No Android device is connected to this build host.
 
 ## Acceptance-case traceability
 
@@ -48,15 +56,15 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-19 | Owner confirmed OpenRouter and chat with Claude Sonnet 4.6; llm.test.ts and storage.test.ts verify model/authentication/secure-key calls. |
 | AT-20 | llm.test.ts checks context and unknown metrics; Garmin inventory still partial. |
 | AT-21 | llm.test.ts verifies 20,000-character limits; UI notice implemented. |
-| AT-22 | llm.test.ts covers HTTP and incomplete-response fixtures; live/network/timeout checks pending. |
+| AT-22 | llm.test.ts covers HTTP, provider errors inside HTTP 200, incomplete JSON/SSE, and bounded retry recovery; live plan recovery/timeout checks pending. |
 | AT-23 | llm.test.ts verifies zero network calls without a key; browser error verified. |
 | AT-24 | llm.test.ts inspects safety instructions; real symptom conversation check pending. |
 | AT-25 | chat.test.ts verifies ten threads and resumed messages; device restart pending. |
-| AT-26 | 0.1.0 device login failed with unreadable activity data; mobile token exchange/profile validation regression tests pass. New live login pending. |
+| AT-26 | Owner confirms mobile-adapter Garmin connection works; mobile token exchange/profile validation regression tests pass. |
 | AT-27 | storage.test.ts verifies secret storage and blank-password retention; device input/session check pending. |
-| AT-28 | On-demand sync/cache/time controls implemented; real sync/offline restart pending. |
+| AT-28 | Owner confirms activity import works; sync/cache/time fixtures pass; offline restart pending. |
 | AT-29 | garmin.test.ts verifies run/ride mapping, deduplication, optional metrics, and malformed input; lap retrieval not implemented. |
-| AT-30 | Partial-history baseline derived; zones/fitness/load/recovery unknown. Real-account supported-field inventory pending. |
+| AT-30 | Partial-history baseline and fetched VO₂/cycling power/zones included in coaching context; new metric mappings tested, real-account comparison pending. Load/recovery unknown. |
 | AT-31 | garmin.test.ts covers unauthorized disconnect; real expiry/cache/network checks pending. |
 | AT-32 | app.test.tsx verifies generation lock; global action lock implemented; other concurrent controls need device checks. |
 | AT-33 | exports.test.ts covers actual dates; PDF/calendar import acceptance pending. |
@@ -75,6 +83,10 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-46 | Browser preview compiles and basic flows verified; broader responsive/backup checks pending. Optional. |
 | AT-47 | Deferred Garmin workout push. Optional. |
 | AT-48 | Deferred Garmin push retry tracking. Optional. |
+| AT-49 | garmin.test.ts verifies latest-50 retention, request limit, and legacy-state migration with chats preserved. |
+| AT-50 | garmin.test.ts and markdown-chat.test.tsx cover precise VO₂, cycling FTP/kg, missing values, profile fallback, zone ranges, timestamps, cache warnings, and Settings display. app.test.tsx verifies activity persistence with optional metric failures. Live metric comparison pending. |
+| AT-51 | markdown-chat.test.tsx covers headings/emphasis/lists/quotes/code/tables/links, literal HTML, blocked unsafe protocols, and image descriptions. Native visual recheck pending. |
+| AT-52 | llm.test.ts covers complete/truncated SSE, keep-alives, malformed JSON, HTTP-200 provider errors, bounded retry, and full 27-week horizon; app.test.tsx verifies explicit acceptance before save. Live plan recheck pending. |
 
 ## Device acceptance sequence
 

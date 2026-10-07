@@ -8,7 +8,7 @@ import { parseGoalMarkdown } from './goal';
 import { acceptProposal, upcoming } from './plan';
 import { generatePlan, askCoach } from './llm';
 import { appendExchange } from './chat';
-import { disconnect, isConnected, pullActivitySummaries, signIn } from './garmin';
+import { disconnect, isConnected, pullActivitySummaries, pullFitness, signIn } from './garmin';
 import { shareBackup, shareExport } from './exports';
 import { decodeBackup } from './backup';
 import { constraintIssues } from './constraints';
@@ -106,8 +106,10 @@ function useController() {
       try {
         if (!await isConnected()) throw new Error('Connect Garmin in Settings first.');
         const activities = await pullActivitySummaries();
-        await commit({ ...current.current, activities, lastSync: new Date().toISOString() }); setConnected(true);
-        setNotice(`Synced ${activities.length} running/cycling activities.`);
+        setBusy('Syncing Garmin fitness metrics…');
+        const fitness = await pullFitness(current.current.fitness);
+        await commit({ ...current.current, activities, fitness, lastSync: new Date().toISOString() }); setConnected(await isConnected());
+        setNotice(`Synced ${activities.length} running/cycling activities. ${fitness.warnings.length ? 'Some fitness metrics could not refresh; see Settings.' : 'Fitness metrics refreshed.'}`);
       } catch (e) { setConnected(await isConnected()); throw e; }
     }),
     disconnect: () => run('Disconnecting Garmin…', async () => { await disconnect(); setConnected(false); setNotice('Garmin disconnected. Cached activities retained.'); }),
