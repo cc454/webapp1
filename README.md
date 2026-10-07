@@ -13,12 +13,12 @@ The repository contains TypeScript modules, training content, and test scaffolds
 
 - Personal Android use, English, metric units, and minimalist dark styling.
 - Today plus six days of workouts and a full overview through the event date.
-- Claude/Gemini with user-supplied secure keys and reviewable plan proposals.
+- OpenRouter with a securely stored user-supplied API key and selectable model and reviewable plan proposals.
 - On-demand Garmin activity/athlete sync using available metrics.
 - Ten retained chat threads, manual completion, Markdown/PDF/calendar exports, and current-plan backup/restore.
 - Optional browser access and Garmin workout/calendar push.
 
-App state stays local. Coaching sends selected context directly to the chosen provider. Garmin communication is separate; Garmin secrets never belong in coaching or backups. Cross-device synchronization is not specified.
+App state stays local. Coaching sends selected context through OpenRouter to the selected downstream model provider. Garmin communication is separate; Garmin secrets never belong in coaching or backups. Cross-device synchronization is not specified.
 
 ## Training content
 
@@ -26,7 +26,7 @@ The authoritative files are [goal.md](training/goal.md), [research.md](training/
 
 Goal fields are name, date, distance, target time, and elevation. Time is hours:minutes, optionally hours:minutes:seconds. Calculate pace from time/distance; a legacy pace field cannot override it.
 
-The current goal is Halbmarathon on 11 April 2026, which is past and needs the owner's correction before real plan generation. Its 21.1 km / 2:00 target calculates to approximately 5:41/km, superseding the supplied 5:30/km.
+The current goal is Halbmarathon on 11 April 2027, updated by the owner. Its 21.1 km / 2:00 target calculates to approximately 5:41/km, superseding the supplied 5:30/km.
 
 ## Development and delivery
 
