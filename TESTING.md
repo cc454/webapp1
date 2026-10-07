@@ -5,7 +5,7 @@ Updated 7 October 2026 after recovery from a reboot. Passing automated cases are
 ## Executed checks
 
 - Strict TypeScript: passed (`pnpm typecheck`).
-- Jest: 61 tests across 12 suites passed after reboot (`pnpm test`); the additional Garmin service-ticket regression and all six Garmin tests passed after the final adapter change (62 cases total).
+- Jest: 62 tests across 12 suites passed in [GitHub CI for commit 10e961b](https://github.com/cc454/webapp1/actions/runs/37596204501); strict TypeScript and web export also passed in that clean Linux installation.
 - Expo compatibility check: passed before reboot.
 - Web export: rebuilt after reboot with the corrected hoisted dependency layout; preview restarted on localhost:8082. Reload retains the event and calculated 5:41/km pace.
 - Android JavaScript/Hermes export: compiled before reboot.

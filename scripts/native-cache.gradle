@@ -1,0 +1,11 @@
+// Keep CMake, prefab and Ninja paths below Windows' legacy path limit.
+gradle.beforeProject { project ->
+    ['com.android.application', 'com.android.library'].each { pluginId ->
+        project.plugins.withId(pluginId) {
+            def cacheRoot = System.getenv('STRIDE_NATIVE_CACHE')
+            if (cacheRoot) {
+                project.android.externalNativeBuild.cmake.buildStagingDirectory = new File(cacheRoot, project.name)
+            }
+        }
+    }
+}
