@@ -8,7 +8,7 @@ The owner now confirms Garmin connection/activity import and the chat keyboard/d
 
 The update limits fetched/cached activities to 50, migrates old state without losing chats/settings, fetches VO₂ max/cycling FTP/kg/heart-rate zones, and adds Settings units/timestamps/warnings. Optional endpoint failures retain cached fitness values and do not discard successful activities. Chat renders Markdown, including code and tables, with raw HTML treated as text, safe link protocols, and descriptive image text.
 
-Strict TypeScript and 93 tests across 14 suites pass. Tests cover a 27-week creation-to-event horizon, complete/incomplete SSE, empty/malformed envelopes, HTTP-200 provider errors, bounded retry recovery/exhaustion, acceptance-before-save, supported Garmin mappings, legacy migration, partial sync, Markdown rendering, and fitness Settings display. The first 0.1.2 source update also passed [clean-install CI](https://github.com/cc454/webapp1/actions/runs/37607642075). Browser inspection confirmed the new fitness section and missing-data labels. The first native 0.1.2 build succeeded; the constraint follow-up is being rebuilt for delivery.
+Strict TypeScript, 93 tests across 14 suites, and web export pass locally and in [clean-install CI for the final source change](https://github.com/cc454/webapp1/actions/runs/37609385969). Tests cover a 27-week creation-to-event horizon, complete/incomplete SSE, empty/malformed envelopes, HTTP-200 provider errors, bounded retry recovery/exhaustion, acceptance-before-save, supported Garmin mappings, legacy migration, partial sync, Markdown rendering, and fitness Settings display. Browser inspection confirmed the new fitness section and missing-data labels. The final native 0.1.2 build passed; signature and package metadata confirm the same certificate as the installed app, version code 3, target API 36, and ARM64/ARMv7 support.
 
 The owner supplied the exact remaining validation error: a long session on Monday 2026-10-12 exceeded 40 minutes. Every initial and repair request now starts with a schedule-construction brief: explicit rest quota, permitted long-session weekdays/dates, Monday's total 2,400-second cap, previous-day hard-session restrictions, and the saved additional constraints/guidance. Provider schemas pin batch dates and enforced rule values. A regression reproduces both Monday violations and verifies constraint instructions exist before generation and during repair; final validation and review remain mandatory. Real-model recovery still needs a phone check.
 
@@ -31,7 +31,7 @@ The 0.1.1 update replaces the web-cookie Garmin transport with mobile token auth
 
 ## Acceptance-case traceability
 
-APK 0.1.1: `artifacts/stride-ai-release.apk`, 59,524,612 bytes. SHA-256: `567d153ae88b9ed8cd510f5d01781511f31e541eb923e836b0254179fc3788e6`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`.
+Current APK 0.1.2 (version code 3): `artifacts/stride-ai-release.apk`, 59,740,324 bytes. SHA-256: `a07be1ed491dbc59794361096a39d1e292f3fe35193012fbe1c5fd4c1dddab9e`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
 
 Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md. “Pending” and “partial” are intentional: the Android release is not yet fully accepted.
 
@@ -79,9 +79,9 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-40 | llm.test.ts checks endpoint/auth and exclusion of Garmin email; full device traffic inspection pending. |
 | AT-41 | Native SecureStore calls tested and disclosure implemented; native state/log/network inspection pending. |
 | AT-42 | Strict type checking passed. |
-| AT-43 | Suite passed; several manual acceptance checks remain. CI configuration added but not yet run on GitHub. |
+| AT-43 | All 93 tests, strict checking, and web export passed in clean-install GitHub CI; several manual acceptance checks remain. |
 | AT-44 | Workspace-local SDK/JDK installed; native release packaging completed successfully with the Windows path fixes. |
-| AT-45 | Testing-only debug-signed APK produced and signature verified; phone installation and data-preserving upgrade checks pending. |
+| AT-45 | Testing-only 0.1.2 APK built; signature matches the installed version, package and ARM architectures verified. Owner confirmed earlier phone installation; current upgrade/metric/plan rechecks pending. |
 | AT-46 | Browser preview compiles and basic flows verified; broader responsive/backup checks pending. Optional. |
 | AT-47 | Deferred Garmin workout push. Optional. |
 | AT-48 | Deferred Garmin push retry tracking. Optional. |
