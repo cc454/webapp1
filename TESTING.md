@@ -8,7 +8,7 @@ The owner reported an input-mismatch error after pressing discard, with Generate
 
 A background completion callback also loaded the draft asynchronously without checking whether it had since been discarded/replaced. A read-version guard now prevents a delayed result/error from restoring deleted draft state. The regression deliberately resolves that read after deletion and verifies the fresh-generation button stays enabled. If a complete proposal arrives while the dialog is open, confirmation clears that in-memory proposal too. Signatures now compare canonical nested JSON values, supporting older unsorted signatures and avoiding false mismatches when Zod/storage reorders keys. Both weekly and library engines resume reordered complete-draft signatures without provider calls; changed values remain incompatible.
 
-Strict TypeScript, the prior full 127-test run, the additional late-proposal regression and web export pass. The final suite contains 128 tests across 20 suites. New UI tests cover confirmation/cancellation, failed deletion/retry, clear-then-generate with a null draft, and the stale-read/proposal races. Native packaging, signature and final CI results will be recorded when finished. The owner's exact phone flow still needs a recheck; these reproductions identify supported failure paths, not a captured trace from the phone.
+Strict TypeScript, 128 tests across 20 suites and web export pass in [clean-install CI for final source 3a58acd](https://github.com/cc454/webapp1/actions/runs/37628752235). New UI tests cover confirmation/cancellation, failed deletion/retry, clear-then-generate with a null draft, and the stale-read/proposal races. Native packaging passes; final incremental bundling includes the late-proposal fix. APK verification confirms 0.1.5/code 6, target API 36, ARM64/ARMv7 and the same signing certificate. The owner's exact phone flow still needs a recheck; these reproductions identify supported failure paths, not a captured trace from the phone.
 
 ## Workout Library and 0.1.4 update
 
@@ -59,7 +59,7 @@ The 0.1.1 update replaces the web-cookie Garmin transport with mobile token auth
 
 ## Acceptance-case traceability
 
-Current APK 0.1.4 (version code 5): `artifacts/stride-ai-release.apk`, 59,813,120 bytes. SHA-256: `c6b16c95c6cc8f3bf8ed5f9398eda53250ea825a1e7737d5d358bbe8f80b663a`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
+Current APK 0.1.5 (version code 6): `artifacts/stride-ai-release.apk`, 59,816,868 bytes. SHA-256: `6036e50a2283e807808265b2f1a354358bb09ab1d962907d0b8f2abd8838d594`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
 
 Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md. “Pending” and “partial” are intentional: the Android release is not yet fully accepted.
 
@@ -107,9 +107,9 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-40 | llm.test.ts checks endpoint/auth and exclusion of Garmin email; full device traffic inspection pending. |
 | AT-41 | Native SecureStore calls tested and disclosure implemented; native state/log/network inspection pending. |
 | AT-42 | Strict type checking passed. |
-| AT-43 | All 122 tests, strict checking, and web export passed in clean-install GitHub CI for 0.1.4; several manual acceptance checks remain. |
+| AT-43 | All 128 tests, strict checking, and web export passed in clean-install GitHub CI for 0.1.5; several manual acceptance checks remain. |
 | AT-44 | Workspace-local SDK/JDK installed; native release packaging completed successfully with the Windows path fixes. |
-| AT-45 | Testing-only 0.1.4 APK built; signature matches the installed version, package and ARM architectures verified. Owner confirmed earlier phone installation; current library/upgrade/metric/plan rechecks pending. |
+| AT-45 | Testing-only 0.1.5 APK built; signature matches the installed version, package and ARM architectures verified. Owner confirmed earlier phone installation; current discard/library/upgrade/metric/plan rechecks pending. |
 | AT-46 | Browser preview compiles and basic flows verified; broader responsive/backup checks pending. Optional. |
 | AT-47 | Deferred Garmin workout push. Optional. |
 | AT-48 | Deferred Garmin push retry tracking. Optional. |
