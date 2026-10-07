@@ -7,7 +7,7 @@ Updated 7 October 2026 after recovery from a reboot. Passing automated cases are
 - Strict TypeScript: passed (`pnpm typecheck`).
 - Jest: 61 tests across 12 suites passed after reboot (`pnpm test`).
 - Expo compatibility check: passed before reboot.
-- Web export: compiled before reboot; preview restarted on localhost:8082.
+- Web export: rebuilt after reboot with the corrected hoisted dependency layout; preview restarted on localhost:8082. Reload retains the event and calculated 5:41/km pace.
 - Android JavaScript/Hermes export: compiled before reboot.
 - Android prebuild: passed. Native APK build is still in progress; install/upgrade checks are pending.
 - Browser UI: goal loading, calculated 5:41/km pace, navigation, no-key generation error, and reload persistence were verified before reboot.
