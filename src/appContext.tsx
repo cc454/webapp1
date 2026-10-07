@@ -98,7 +98,7 @@ function useController() {
     exportLibrary: () => run('Exporting workout library…', async () => { await shareWorkoutLibrary(current.current.settings.workoutLibrary); }),
     resetLibrary: () => run('Restoring starter library…', async () => { await commit({...current.current,settings:{...current.current.settings,workoutLibrary:defaultWorkoutLibrary}});setNotice('Starter workout library restored. Your active plan is unchanged.'); }),
     cancelGeneration: () => { generator.current?.abort(); cancelBackgroundGeneration(); },
-    discardDraft: () => run('Discarding generation draft…', async () => { await clearDraft(); setNotice('Generation draft discarded. You can start a fresh proposal.'); }),
+    discardDraft: () => run('Discarding generation draft…', async () => { await clearDraft(); setReview(value => value?.kind === 'proposal' ? null : value); setNotice('Generation draft discarded. You can start a fresh proposal.'); }),
     rejectReview: () => run('Rejecting proposal…', async () => { if (review?.kind === 'proposal') await clearDraft(); setReview(null); }),
     reset: () => run('Resetting local data…', async () => { await clearDraft(); await commit(emptyState()); setRecovery(false); setReview(null); setThreadId(null); setNotice('Local plan and chat data reset. Credentials are unchanged.'); }),
     configure: (settings: AppState['settings'], key: string, password: string) => run('Saving settings…', async () => {

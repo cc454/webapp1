@@ -90,6 +90,16 @@ describe('AT-14,32,38: rendered app flows', () => {
     expect(screen.getAllByText('Could not remove saved draft.').length).toBeGreaterThan(0);expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeDisabled();
     fireEvent.press(screen.getByRole('button',{name:'Confirm discard draft'}));await screen.findByText('Generation draft discarded. You can start a fresh proposal.');expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeEnabled();
   });
+  it('also clears a proposal that arrives while discard confirmation is open',async()=>{
+    const state=emptyState();const plan=fixturePlan();state.event=plan.event;
+    const partial={version:1,request:'',signature:'saved-inputs',start:plan.start,end:plan.end,workouts:[],overview:[]};
+    (loadState as jest.Mock).mockResolvedValue(state);(loadGenerationDraft as jest.Mock).mockResolvedValueOnce(partial).mockResolvedValueOnce({...partial,workouts:plan.workouts,overview:plan.overview});
+    render(<AppProvider><PlanScreen/></AppProvider>);await screen.findByText('Saved generation draft');
+    fireEvent.press(screen.getByRole('button',{name:'Discard saved draft'}));const listener=(subscribeGeneration as jest.Mock).mock.calls[0][0];
+    act(()=>listener('Generating local week 1…'));await act(async()=>listener(''));await screen.findByText('PROPOSAL / NOT SAVED');
+    fireEvent.press(screen.getByRole('button',{name:'Confirm discard draft'}));await screen.findByText('Generation draft discarded. You can start a fresh proposal.');
+    expect(screen.queryByText('PROPOSAL / NOT SAVED')).toBeNull();expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeEnabled();expect(saveState).not.toHaveBeenCalled();
+  });
   it('saves successful activities even if optional fitness refresh has a warning', async () => {
     const state=emptyState(); (loadState as jest.Mock).mockResolvedValue(state);
     (isConnected as jest.Mock).mockResolvedValue(true);
