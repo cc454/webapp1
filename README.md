@@ -56,6 +56,8 @@ The generated release variant uses the template debug certificate for personal t
 
 Ten chats means ten conversation threads ordered by recent use. The oldest is removed when a new thread would exceed ten. Workout completion is manual.
 
+The native Garmin adapter consumes the SSO service ticket before verifying activity access, following the [maintained client session flow](https://github.com/cyberjunky/python-garminconnect/blob/master/garminconnect/client.py). This consumer interface still requires testing with the owner's account.
+
 ## Goal and scheduling rules
 
 The bundled [goal.md](training/goal.md) specifies Halbmarathon on 11 April 2027. Required fields are name, date, distance in km, target time as H:MM (optional seconds), and elevation in m. Pace is calculated: 21.1 km in 2:00 is approximately 5:41/km; legacy pace text is ignored.

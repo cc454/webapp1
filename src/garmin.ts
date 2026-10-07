@@ -48,6 +48,15 @@ export async function signIn(email: string, password: string) {
     const html = await response.text();
     if (!response.ok || /invalid.*(username|password)|incorrect.*password/i.test(html)) throw new GarminError('Garmin rejected those credentials.');
     if (/multi.factor|verification code|one.time code/i.test(html)) throw new GarminError('This Garmin sign-in requires additional verification, which this adapter does not support yet.');
+    // SSO returns a service ticket in HTML rather than an HTTP redirect.
+    // Consume it only at our fixed Garmin service URL, never a supplied URL.
+    const ticket = html.match(/\bticket=(ST-[a-zA-Z0-9._%-]+)/)?.[1];
+    if (ticket) {
+      const session = await fetch(`${CONNECT}/modern/?ticket=${encodeURIComponent(decodeURIComponent(ticket))}`, {
+        credentials: 'include', signal: controller.signal, redirect: 'follow',
+      });
+      if (!session.ok) throw new GarminError('Garmin could not establish a Connect session.');
+    }
     await CookieManager.flush();
     // A cookie alone is insufficient: prove access to the authenticated activity endpoint.
     await pullActivitySummaries(1);

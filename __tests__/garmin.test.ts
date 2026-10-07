@@ -20,4 +20,12 @@ describe('AT-26–31: Garmin adapter (mocked; device verification separate)', ()
     (fetch as jest.Mock).mockResolvedValueOnce(response('<input value="csrf" name="_csrf">')).mockResolvedValueOnce(response('ok')).mockResolvedValueOnce(response([run]));
     await signIn('athlete@example.com', 'password'); expect(fetch).toHaveBeenCalledTimes(3); expect(saveGarminSession).toHaveBeenCalled();
   });
+  it('consumes the SSO ticket at Garmin before checking activity access', async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce(response('<input value="csrf" name="_csrf">'))
+      .mockResolvedValueOnce(response('https://untrusted.invalid/?ticket=ST-fixture'))
+      .mockResolvedValueOnce(response('Connect')).mockResolvedValueOnce(response([run]));
+    await signIn('athlete@example.com', 'password');
+    expect((fetch as jest.Mock).mock.calls[2][0]).toBe('https://connect.garmin.com/modern/?ticket=ST-fixture');
+    expect((fetch as jest.Mock).mock.calls[3][0]).toContain('activitylist-service');
+  });
 });
