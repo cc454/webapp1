@@ -31,6 +31,7 @@ describe('Late-week failure and durable generation',()=>{
     jest.setSystemTime(new Date('2027-04-06T12:00:00Z'));(fetch as jest.Mock).mockReset().mockResolvedValue(response(second));
     const result=await generatePlan(state,'key','',()=>{},undefined,{draft,save});
     expect(fetch).toHaveBeenCalledTimes(1);expect(result.start).toBe('2027-04-05');expect(result.workouts).toHaveLength(14);expect(state.plan).toBeNull();
+    draft!.signature=JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(draft!.signature)).reverse()));
     (fetch as jest.Mock).mockClear();await generatePlan(state,'key','',()=>{},undefined,{draft,save});expect(fetch).not.toHaveBeenCalled();
   });
   it('refuses a checkpoint from changed inputs before making a paid request',async()=>{

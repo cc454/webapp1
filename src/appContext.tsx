@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { AppState, Plan, GenerationDraft } from './types';
 import { emptyState } from './defaults';
@@ -10,6 +10,7 @@ import { generatePlan, askCoach, generationSignature } from './llm';
 import { generateLibraryPlan } from './libraryPlanner';
 import { parseWorkoutLibrary } from './workoutLibrary';
 import { defaultWorkoutLibrary } from './workoutLibraryDefaults';
+import { matchesGenerationInputs } from './generationInputs';
 import { withGenerationBackground, generationProgress, subscribeGeneration, cancelBackgroundGeneration } from './generationBackground';
 import { appendExchange } from './chat';
 import { disconnect, isConnected, pullActivitySummaries, pullFitness, signIn } from './garmin';
@@ -33,6 +34,7 @@ function useController() {
   const locked = useRef(false);
   const current = useRef(state);
   const generator = useRef<AbortController | null>(null);
+  const draftEpoch = useRef(0);
   useEffect(() => {
     let mounted = true;
     let generationSeen = false;
@@ -42,15 +44,16 @@ function useController() {
       if (text) generationSeen = true;
       else if (generationSeen) {
         generationSeen = false;
+        const epoch = draftEpoch.current;
         void loadGenerationDraft().then(saved => {
-          if (!mounted) return;
+          if (!mounted || epoch !== draftEpoch.current) return;
           setDraft(saved);
           const value = current.current;
-          if (saved && saved.overview.at(-1)?.end === saved.end && saved.signature === generationSignature(value, saved.request, saved.pipeline === 'library')) {
+          if (saved && saved.overview.at(-1)?.end === saved.end && matchesGenerationInputs(saved.signature, generationSignature(value, saved.request, saved.pipeline === 'library'))) {
             const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: saved.start, end: saved.end, rules: value.settings.rules, workouts: saved.workouts, overview: saved.overview, strategy: saved.outline?.strategy, progressions: saved.outline?.progressions, constraintDecisions: saved.outline?.constraintDecisions }, value.event!, value.settings.rules);
             setReview({ kind: 'proposal', plan });
           }
-        }).catch(e => { if (mounted) setError(e instanceof Error ? e.message : 'Saved generation could not load.'); });
+        }).catch(e => { if (mounted && epoch === draftEpoch.current) { setDraftError(true); setError(e instanceof Error ? e.message : 'Saved generation could not load.'); } });
       }
     });
     loadState().then(async value => {
@@ -59,7 +62,7 @@ function useController() {
       catch (e) { if (mounted) { setDraftError(true); setError(e instanceof Error ? e.message : 'Generation draft could not load.'); } }
       if (mounted) {
         current.current = value; setState(value); setDraft(savedDraft); setReady(true);
-        if (savedDraft?.overview.at(-1)?.end === savedDraft?.end && savedDraft && savedDraft.signature === generationSignature(value, savedDraft.request, savedDraft.pipeline === 'library')) {
+        if (savedDraft?.overview.at(-1)?.end === savedDraft?.end && savedDraft && matchesGenerationInputs(savedDraft.signature, generationSignature(value, savedDraft.request, savedDraft.pipeline === 'library'))) {
           try {
             const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: savedDraft.start, end: savedDraft.end, rules: value.settings.rules, workouts: savedDraft.workouts, overview: savedDraft.overview, strategy: savedDraft.outline?.strategy, progressions: savedDraft.outline?.progressions, constraintDecisions: savedDraft.outline?.constraintDecisions }, value.event!, value.settings.rules);
             setReview({ kind: 'proposal', plan });
@@ -75,6 +78,11 @@ function useController() {
     await saveState(value);
     current.current = value; setState(value);
   }
+  async function clearDraft() {
+    // A read started when generation ended must not resurrect a deleted draft.
+    draftEpoch.current++;
+    await clearGenerationDraft(); setDraft(null); setDraftError(false);
+  }
   async function run(label: string, action: () => Promise<void>) {
     if (locked.current || !ready) return false;
     locked.current = true; setBusy(label); setError(''); setNotice('');
@@ -82,16 +90,17 @@ function useController() {
     finally { locked.current = false; setBusy(''); }
   }
   const available = ready && !busy && !recovery;
-  return { state, ready, recovery, busy, error, notice, connected, review, draft, draftError, threadId, available,
+  const draftMismatch = useMemo(() => !!draft && !matchesGenerationInputs(draft.signature, generationSignature(state, draft.request, draft.pipeline === 'library')), [draft, state]);
+  return { state, ready, recovery, busy, error, notice, connected, review, draft, draftError, draftMismatch, threadId, available,
     setReview, setThreadId,
     saveLibrary: (workoutLibrary: string) => run('Saving workout library…', async () => { parseWorkoutLibrary(workoutLibrary); await commit({ ...current.current, settings: { ...current.current.settings, workoutLibrary } }); setNotice('Workout library saved. Your active plan is unchanged.'); }),
     importLibrary: () => run('Importing workout library…', async () => { const text=await pickMarkdownFile(); if(text===null)return; parseWorkoutLibrary(text); await commit({...current.current,settings:{...current.current.settings,workoutLibrary:text}});setNotice('Workout library imported. Your active plan is unchanged.'); }),
     exportLibrary: () => run('Exporting workout library…', async () => { await shareWorkoutLibrary(current.current.settings.workoutLibrary); }),
     resetLibrary: () => run('Restoring starter library…', async () => { await commit({...current.current,settings:{...current.current.settings,workoutLibrary:defaultWorkoutLibrary}});setNotice('Starter workout library restored. Your active plan is unchanged.'); }),
     cancelGeneration: () => { generator.current?.abort(); cancelBackgroundGeneration(); },
-    discardDraft: () => run('Discarding generation draft…', async () => { await clearGenerationDraft(); setDraft(null); setDraftError(false); setNotice('Generation draft discarded.'); }),
-    rejectReview: () => run('Rejecting proposal…', async () => { if (review?.kind === 'proposal') { await clearGenerationDraft(); setDraft(null); } setReview(null); }),
-    reset: () => run('Resetting local data…', async () => { await clearGenerationDraft(); setDraft(null); setDraftError(false); await commit(emptyState()); setRecovery(false); setReview(null); setThreadId(null); setNotice('Local plan and chat data reset. Credentials are unchanged.'); }),
+    discardDraft: () => run('Discarding generation draft…', async () => { await clearDraft(); setNotice('Generation draft discarded. You can start a fresh proposal.'); }),
+    rejectReview: () => run('Rejecting proposal…', async () => { if (review?.kind === 'proposal') await clearDraft(); setReview(null); }),
+    reset: () => run('Resetting local data…', async () => { await clearDraft(); await commit(emptyState()); setRecovery(false); setReview(null); setThreadId(null); setNotice('Local plan and chat data reset. Credentials are unchanged.'); }),
     configure: (settings: AppState['settings'], key: string, password: string) => run('Saving settings…', async () => {
       if (key.trim()) await saveApiKey(key); if (Platform.OS !== 'web' && password) await saveGarminPassword(password);
       await commit({ ...current.current, settings }); setNotice('Settings saved. Secret fields have been cleared.');
@@ -111,6 +120,8 @@ function useController() {
     generate: (request = '') => run('Preparing proposal…', async () => {
       if (review) throw new Error('Accept or reject the current review first.');
       if (draftError) throw new Error('Discard the damaged generation draft before restarting.');
+      if (draft && !matchesGenerationInputs(draft.signature, generationSignature(current.current, request, draft.pipeline === 'library'))) throw new Error('The saved draft uses different generation inputs. Discard it before starting a different plan.');
+      draftEpoch.current++;
       const controller = new AbortController(); generator.current = controller;
       try {
         const key = await getApiKey() ?? '';
@@ -132,7 +143,7 @@ function useController() {
         if (issues.length && !review.plan.constraintDecisions?.length) throw new Error(issues.join('\n'));
       }
       const plan = review.kind === 'restore' ? review.plan : acceptProposal(value.plan, review.plan, value.event!, value.settings.rules);
-      await commit({ ...value, event: plan.event, plan }); await clearGenerationDraft(); setDraft(null); setReview(null); setNotice('Reviewed plan saved.'); setRecovery(false);
+      await commit({ ...value, event: plan.event, plan }); await clearDraft(); setReview(null); setNotice('Reviewed plan saved.'); setRecovery(false);
     }),
     toggle: (id: string) => run('Saving completion…', async () => {
       const value = current.current; if (!value.plan || review) return;

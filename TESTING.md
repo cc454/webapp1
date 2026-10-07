@@ -2,6 +2,14 @@
 
 Updated 7 October 2026 after recovery from a reboot. Passing automated cases are evidence for the named logic, not proof of native device behavior or real-service compatibility.
 
+## Draft discard/restart and 0.1.5 update
+
+The owner reported an input-mismatch error after pressing discard, with Generate initial plan still disabled. The old first discard tap only revealed an inline confirmation. It now opens a visible modal; confirm removes the draft, while cancel retains it. Failed deletion keeps the dialog open with feedback and allows retry. Draft-incompatible resume is disabled with an explanation, and generation prerequisites are shown. Successful discard clears error/draft state and re-enables fresh generation without resetting settings or the active plan.
+
+A background completion callback also loaded the draft asynchronously without checking whether it had since been discarded/replaced. A read-version guard now prevents a delayed result/error from restoring deleted draft state. The regression deliberately resolves that read after deletion and verifies the fresh-generation button stays enabled. Signatures now compare canonical nested JSON values, supporting older unsorted signatures and avoiding false mismatches when Zod/storage reorders keys. Both weekly and library engines resume reordered complete-draft signatures without provider calls; changed values remain incompatible.
+
+Strict TypeScript, 127 tests across 20 suites and web export pass. New UI tests cover confirmation/cancellation, failed deletion/retry, clear-then-generate with a null draft, and the stale-read race. Native packaging, signature and CI results will be recorded when finished. The owner's exact phone flow still needs a recheck; these reproductions identify supported failure paths, not a captured trace from the phone.
+
 ## Workout Library and 0.1.4 update
 
 The owner requested an editable Markdown library and LLM-owned progression/recovery/tapering/conflict resolution with local plan assembly. Workout Library is now a fourth route/tab, containing the ten requested categories and separate sport parameter ranges. Its saved Markdown is imported/exported, edited in a bounded field, and validated before replacement. Starter restoration requires confirmation. Legacy state receives the starter; active plans remain unchanged by library edits. `training/workouts.md` is checked against the bundled starter string.
@@ -119,6 +127,7 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-60 | library-planner.test.ts checks two-stage instructions, selected model, Monday repair, bounded outline rebuild and explicit conflict decisions. Live model phase/progression quality pending. |
 | AT-61 | library-planner.test.ts builds a 27-week/two-request fixture, unique independent repeat instances, complete/partial dates, strict bounds and preserved history. workout-library.test.ts verifies chronological between-repetition/set recovery and FTP mapping. |
 | AT-62 | Tests cover saved outline resume, next-day creation dates, complete-draft zero-request reuse, metadata backup round-trip and rendered strategy/constraint/phase review before acceptance. Native background/restart checks pending. |
+| AT-63 | generation-inputs.test.ts verifies nested/legacy JSON ordering and state round-trip compatibility; both generation engines test complete-draft reuse with reordered signatures. app.test.tsx verifies modal cancellation/confirmation, deletion failure/retry, fresh generation without the discarded draft and stale background-read rejection. Phone recheck pending. |
 
 ## Device acceptance sequence
 

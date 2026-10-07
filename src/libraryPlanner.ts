@@ -6,6 +6,7 @@ import { buildCoachContext, completion, generationSignature, portableSchema } fr
 import { addDays, datesBetween, dayOfWeek, today } from './dates';
 import { checkedPlan } from './plan';
 import { constraintIssues } from './constraints';
+import { matchesGenerationInputs } from './generationInputs';
 
 const cancelled = (signal?: AbortSignal) => { if(signal?.aborted)throw new Error('Generation cancelled. Saved planning stages remain available to resume.'); };
 const unique = (values: string[], label: string) => {if(new Set(values).size!==values.length)throw new Error(`Duplicate ${label}.`);};
@@ -89,7 +90,7 @@ export async function generateLibraryPlan(state: AppState, key: string, request=
   if(!key.trim())throw new Error('Add your OpenRouter API key in Settings before generating a plan.');
   if(!state.event)throw new Error('Load a goal in Settings first.');
   const library=parseWorkoutLibrary(state.settings.workoutLibrary), signature=generationSignature(state,request,true), old=persistence?.draft;
-  if(old&&old.signature!==signature)throw new Error('The saved draft uses different generation inputs. Discard it before starting a different plan.');
+  if(old&&!matchesGenerationInputs(old.signature,signature))throw new Error('The saved draft uses different generation inputs. Discard it before starting a different plan.');
   const start=old?.start??state.plan?.start??today(),end=state.event.date;
   if(end<today())throw new Error('The event is in the past. Import a future goal.');
   let draft:GenerationDraft={version:1,signature,request,start,end,workouts:[],overview:[],pipeline:'library',outline:null,blocks:null,...old};

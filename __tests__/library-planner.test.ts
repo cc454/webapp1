@@ -29,6 +29,8 @@ describe('High-level LLM planning and local assembly',()=>{
     copies[0]!.steps[0]!.seconds=1;expect(copies[1]!.steps[0]!.seconds).toBe(1800);
     expect(draft!.pipeline).toBe('library');expect(draft!.blocks).toHaveLength(1);
     const clean=assembleLibraryPlan(outline(),blocks(),library,state,'2027-04-05','2027-04-11');expect(decodeBackup(encodeBackup(clean))).toEqual(clean);
+    // Stored drafts from older builds used unsorted JSON signature keys.
+    draft!.signature=JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(draft!.signature)).reverse()));
     (fetch as jest.Mock).mockClear();await generateLibraryPlan(state,'key','',()=>{},undefined,{draft,save:async()=>{}});expect(fetch).not.toHaveBeenCalled();
   });
   it('retains a successful outline when the parameter request fails, then resumes only stage two',async()=>{
