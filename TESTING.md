@@ -2,6 +2,16 @@
 
 Updated 7 October 2026 after recovery from a reboot. Passing automated cases are evidence for the named logic, not proof of native device behavior or real-service compatibility.
 
+## Workout Library and 0.1.4 update
+
+The owner requested an editable Markdown library and LLM-owned progression/recovery/tapering/conflict resolution with local plan assembly. Workout Library is now a fourth route/tab, containing the ten requested categories and separate sport parameter ranges. Its saved Markdown is imported/exported, edited in a bounded field, and validated before replacement. Starter restoration requires confirmation. Legacy state receives the starter; active plans remain unchanged by library edits. `training/workouts.md` is checked against the bundled starter string.
+
+Fresh generation uses two stages: an LLM strategy/progression/variant/pattern/week outline, then one compact parameter block per distinct variant. A 27-week fixture creates 187 dated entries including its partial final week with two provider calls. Repeats share the prescription but own separate step objects, dates, IDs and completion. Local assembly calculates recoveries between repetitions/sets, durations and sport volumes; library bounds and calendar rules remain enforced. Parameter conflicts are returned to the LLM, followed by at most one outline rebuild if needed. The tests reproduce Monday repair and explicit handling of conflicting prose. Progression, recovery, tapering and training distribution are model decisions; these tests do not prove their physiological suitability.
+
+Both planning stages and assembled weekly drafts are persisted. Tests interrupt after the outline and resume the next day with only the remaining stage; complete drafts cause zero requests. Existing 0.1.3 weekly drafts retain their original resume engine. Tests verify preserved completed history, metadata backup/restore, and review of strategy, constraint decisions and phase volumes before activation. Editing a library invalidates incompatible new drafts before any provider request.
+
+Strict TypeScript and 122 tests across 19 suites pass. Web export passes. Browser inspection confirmed the fourth selected tab, ten templates and a 140-pixel editor with internal scrolling. Native packaging/signature verification and clean-install CI are recorded below when complete. Real-model output quality/cost, native sharing/upgrade and screen-off/resume acceptance remain pending on the owner's phone. No live provider calls were made during development tests, and no measured monetary savings are claimed.
+
 ## Phone feedback and 0.1.3 update
 
 The owner reached week 27, then encountered “Step durations do not match session: 2027-04-08,” losing the unsaved proposal after a $3.60 run. Generated interval totals and overview volumes are now derived locally before scheduling validation. A regression reproduces the April 8 mismatch and resolves it in one provider request; a derived Monday total above the cap remains rejected. Imported backups retain strict validation.
@@ -103,6 +113,12 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-54 | generation-resume.test.ts covers late failure/resume, next-day original dates, complete drafts without requests, and changed inputs. app.test.tsx covers completed-proposal restoration/rejection and corrupt-draft recovery. storage.test.ts verifies a separate SQLite draft table. Physical SQLite restart/resume check pending. |
 | AT-55 | generation-background.test.ts covers registration/progress/cleanup/duplicates/cancellation after remount. Native APK permissions and service type verified. Screen-off, app switch, and force-stop/resume checks remain pending on the owner's phone. |
 | AT-56 | generation-resume.test.ts inspects compact activities, preserved HR, concise output instructions, selected model, local correction and resume request counts. Previous sessions are bounded to fourteen in source. README documents current prices and caching limitations. Actual billing and cheaper-model quality comparison pending. |
+| AT-57 | workout-library.test.ts checks ten IDs and valid sport defaults; workout-library-ui.test.tsx renders the categories. Browser route/tab and editor inspected. Native display pending. |
+| AT-58 | workout-library.test.ts checks syntax, duplicate IDs, ranges, coupled defaults and sport bounds. UI tests cover valid import/export, invalid/cancelled imports, edited save and confirmed restoration. Native file/share/restart check pending. |
+| AT-59 | Legacy settings migration and active-plan-preserving edits are tested; library-planner.test.ts rejects mismatched signatures before requests. Phone upgrade pending. |
+| AT-60 | library-planner.test.ts checks two-stage instructions, selected model, Monday repair, bounded outline rebuild and explicit conflict decisions. Live model phase/progression quality pending. |
+| AT-61 | library-planner.test.ts builds a 27-week/two-request fixture, unique independent repeat instances, complete/partial dates, strict bounds and preserved history. workout-library.test.ts verifies chronological between-repetition/set recovery and FTP mapping. |
+| AT-62 | Tests cover saved outline resume, next-day creation dates, complete-draft zero-request reuse, metadata backup round-trip and rendered strategy/constraint/phase review before acceptance. Native background/restart checks pending. |
 
 ## Device acceptance sequence
 
@@ -114,5 +130,6 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 6. Export all three formats and import the calendar into a real calendar app. Back up, reject a restore, then accept the restore.
 7. Test offline use, failed requests, session expiry, and an upgrade with the same signing identity.
 8. Start generation, permit notifications, turn the screen off and switch apps; verify continuing progress and review. Cancel/reopen/resume and verify completed weeks are retained. Force-stop after a saved week, reopen, and resume; record billing and confirm already validated weeks are not requested again.
+9. In Workout Library export the starter .md, edit a template, import it and restart. Verify saved changes, valid rejection/cancellation and that the active plan is untouched. Generate with the new pipeline, inspect strategy/phase progression and all sessions before acceptance, and record actual token costs and model quality.
 
 Do not record keys, passwords, session cookies, or private raw account data in test evidence committed to Git.

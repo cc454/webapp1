@@ -19,3 +19,7 @@ export async function shareBackup(plan: Plan) {
   await FileSystem.writeAsStringAsync(uri, encodeBackup(plan));
   await share(uri, 'application/json');
 }
+export async function shareWorkoutLibrary(text: string) {
+  const uri = `${FileSystem.cacheDirectory}workout-library.md`;
+  await FileSystem.writeAsStringAsync(uri, text); await share(uri, 'text/markdown');
+}

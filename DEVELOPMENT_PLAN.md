@@ -16,6 +16,8 @@ The authoritative goal is the half marathon in training/goal.md, updated by the 
 
 ## Milestones
 
+The 0.1.4 planning update adds Workout Library as a fourth tab and replaces fresh weekly generation with two LLM stages: overall strategy/progression/calendar patterns, then unique workout parameters. The app expands repeats and calculates totals locally. Progression, recovery, tapering and conflict resolution remain LLM responsibilities; bounded repairs return invalid schedules to the model. Both stages and assembled weeks are checkpointed. Existing 0.1.3 drafts retain their weekly resume path. Athlete review and native/live-model acceptance remain required; see R-57–62 and TESTING.md.
+
 1. **Runnable Android foundation:** restore entry point, dependencies/configuration, asset loading, and dark navigation. Select/document a reproducible non-Ona build workflow. Exit: Android launches, typecheck/tests run (R-01, R-17, R-38–39, R-42–45).
 2. **Early Garmin feasibility:** verify real non-MFA sign-in and on-demand sync on Android; inventory retrievable metrics, secure sessions, cache, and expiry behavior. Exit: run/ride baseline is available with unavailable fields marked unknown (R-26–31, R-40–41). Mocks alone are insufficient.
 3. **Canonical data:** implement ISO dates, numeric metric values/durations, structured sport-specific sessions, variable plan span, calculated pace, revisions, ten chat threads, and versioned persistence. Exit: date boundaries, invalid goals, and state recovery pass (R-02–06, R-08–12, R-16, R-25).

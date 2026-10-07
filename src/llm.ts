@@ -101,10 +101,10 @@ export async function completion(key: string, model: string, messages: { role: s
 export async function askCoach(prompt: string, state: AppState, key: string, history: Message[] = []) {
   return completion(key, state.settings.model, [{ role: 'system', content: buildCoachContext(state) }, ...history.slice(-20).map(m => ({ role: m.role, content: m.content.slice(0, 6000) })), { role: 'user', content: prompt }]);
 }
-export function generationSignature(state: AppState, request: string) {
+export function generationSignature(state: AppState, request: string, library = false) {
   // Exact comparison avoids resuming a draft built from different inputs. Secrets
   // and Garmin account identifiers never enter the draft or provider payload.
-  return JSON.stringify({ event: state.event, plan: state.plan, model: state.settings.model, rules: state.settings.rules, research: state.settings.research.slice(0, 20000), constraints: state.settings.constraints.slice(0, 20000), activities: state.activities, fitness: state.fitness, request });
+  return JSON.stringify({ event: state.event, plan: state.plan, model: state.settings.model, rules: state.settings.rules, research: state.settings.research.slice(0, 20000), constraints: state.settings.constraints.slice(0, 20000), activities: state.activities, fitness: state.fitness, request, ...(library ? {pipeline:'library',workoutLibrary:state.settings.workoutLibrary}: {}) });
 }
 export function normalizeGeneratedBatch(plan: Plan): Plan {
   const workouts = plan.workouts.map(w => w.sport !== 'rest' && w.steps.length ? { ...w, durationSeconds: w.steps.reduce((sum, step) => sum + step.seconds * step.repeats, 0) } : w);
@@ -189,7 +189,7 @@ export async function generatePlan(state: AppState, key: string, request = '', p
 
 // Providers accept different JSON Schema subsets. Keep structural guarantees in
 // the request; Zod and checkedPlan enforce numeric/date/length limits locally.
-function portableSchema(value: unknown): any {
+export function portableSchema(value: unknown): any {
   if (Array.isArray(value)) return value.map(portableSchema);
   if (!value || typeof value !== 'object') return value;
   const omitted = new Set(['$schema', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'minLength', 'maxLength', 'minItems', 'maxItems', 'pattern', 'format']);

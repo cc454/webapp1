@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { defaultWorkoutLibrary } from './workoutLibraryDefaults';
+import { parametersSchema, progressionSchema, outlineSchema, blockSchema } from './libraryTypes';
 
 export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
   const d = new Date(`${value}T12:00:00Z`);
@@ -18,7 +20,8 @@ export const workoutSchema = z.object({
   detail: z.string().max(3000), sport: z.enum(['run', 'ride', 'rest']),
   durationSeconds: z.number().int().nonnegative(), distanceKm: z.number().nonnegative(),
   intensity: z.enum(['easy', 'hard', 'rest']), long: z.boolean(),
-  completed: z.boolean(), steps: z.array(stepSchema).max(100),
+  completed: z.boolean(), steps: z.array(stepSchema).max(200),
+  templateId: z.string().optional(), parameters: parametersSchema.optional(),
 });
 export const overviewSchema = z.object({
   start: isoDate, end: isoDate, phase: z.string().min(1), focus: z.string().min(1),
@@ -32,6 +35,7 @@ export const planSchema = z.object({
   version: z.literal(1), revision: z.number().int().min(1), event: eventSchema,
   start: isoDate, end: isoDate, rules: rulesSchema,
   workouts: z.array(workoutSchema).max(10000), overview: z.array(overviewSchema).min(1).max(1000),
+  strategy: z.string().optional(), progressions: z.array(progressionSchema).optional(), constraintDecisions: z.array(z.string()).optional(),
 });
 export const activitySchema = z.object({
   id: z.number().int(), sport: z.enum(['run', 'ride']), name: z.string(), startedAt: z.string(),
@@ -50,7 +54,7 @@ export const fitnessSchema = z.object({
 export type GarminFitness = z.infer<typeof fitnessSchema>;
 export const stateSchema = z.object({
   version: z.literal(1), event: eventSchema.nullable(), plan: planSchema.nullable(),
-  settings: z.object({ model: z.string().min(1), research: z.string(), constraints: z.string(), garminEmail: z.string(), rules: rulesSchema }),
+  settings: z.object({ model: z.string().min(1), research: z.string(), constraints: z.string(), garminEmail: z.string(), rules: rulesSchema, workoutLibrary: z.string().default(defaultWorkoutLibrary) }),
   activities: z.array(activitySchema).transform(items => [...items].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 50)),
   fitness: fitnessSchema.default({ vo2: null, power: null, zones: null, warnings: [] }),
   lastSync: z.string().nullable(), threads: z.array(threadSchema).max(10),
@@ -67,5 +71,6 @@ export type AppSettings = AppState['settings'];
 export const generationDraftSchema = z.object({
   version: z.literal(1), signature: z.string(), request: z.string().default(''), start: isoDate, end: isoDate,
   workouts: z.array(workoutSchema), overview: z.array(overviewSchema),
+  pipeline: z.enum(['weekly','library']).optional(), outline: outlineSchema.nullable().optional(), blocks: z.array(blockSchema).nullable().optional(),
 });
 export type GenerationDraft = z.infer<typeof generationDraftSchema>;

@@ -14,3 +14,4 @@ export async function shareExport(kind: 'md' | 'ics' | 'pdf', event: EventDetail
   download(`${safeFilename(event.name)}-training-plan.${kind}`, kind === 'ics' ? ics(event, workouts) : markdown(event, workouts), kind === 'ics' ? 'text/calendar' : 'text/markdown');
 }
 export async function shareBackup(plan: Plan) { download(`${safeFilename(plan.event.name)}-backup.json`, encodeBackup(plan), 'application/json'); }
+export async function shareWorkoutLibrary(text: string) { download('workout-library.md',text,'text/markdown'); }

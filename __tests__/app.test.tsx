@@ -4,6 +4,7 @@ jest.mock('../src/garmin', () => ({ isConnected: jest.fn(async () => false), dis
 jest.mock('../src/exports', () => ({ shareBackup: jest.fn(), shareExport: jest.fn() }));
 jest.mock('../src/markdown', () => ({ loadBundledMarkdown: jest.fn(), pickMarkdownFile: jest.fn(), pickTextFile: jest.fn() }));
 jest.mock('../src/llm', () => ({ generatePlan: jest.fn(), askCoach: jest.fn(), isTruncated: () => false, generationSignature: () => 'saved-inputs' }));
+jest.mock('../src/libraryPlanner', () => ({ generateLibraryPlan: (...args:unknown[]) => require('../src/llm').generatePlan(...args) }));
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import App from '../App';
@@ -27,8 +28,10 @@ describe('AT-14,32,38: rendered app flows', () => {
     (generatePlan as jest.Mock).mockImplementation(() => new Promise(r => { resolve = r; })); render(<App />);
     const button = await screen.findByRole('button', { name: 'Generate initial plan' });
     await waitFor(() => expect(button).toBeEnabled()); fireEvent.press(button); fireEvent.press(button);
-    await waitFor(() => expect(generatePlan).toHaveBeenCalledTimes(1)); resolve(fixturePlan());
+    await waitFor(() => expect(generatePlan).toHaveBeenCalledTimes(1)); resolve({...fixturePlan(),strategy:'Review this recovery and taper strategy.',progressions:[],constraintDecisions:['Prioritize the enforced rest quota.']});
     await screen.findByText('PROPOSAL / NOT SAVED'); expect(saveState).not.toHaveBeenCalled();
+    expect(screen.getByText('Review this recovery and taper strategy.')).toBeTruthy();expect(screen.getByText('Constraint decision: Prioritize the enforced rest quota.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button',{name:'Review proposed phase progression'}));expect(screen.getByText('2027-04-05 → 2027-04-11 · Taper')).toBeTruthy();expect(saveState).not.toHaveBeenCalled();
     fireEvent.press(screen.getByRole('button', { name: 'Accept and save' }));
     await waitFor(() => expect(saveState).toHaveBeenCalledTimes(1)); expect((saveState as jest.Mock).mock.calls[0][0].plan).not.toBeNull();
   });

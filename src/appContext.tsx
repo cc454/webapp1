@@ -7,10 +7,13 @@ import { loadBundledMarkdown, pickMarkdownFile, pickTextFile } from './markdown'
 import { parseGoalMarkdown } from './goal';
 import { acceptProposal, upcoming } from './plan';
 import { generatePlan, askCoach, generationSignature } from './llm';
+import { generateLibraryPlan } from './libraryPlanner';
+import { parseWorkoutLibrary } from './workoutLibrary';
+import { defaultWorkoutLibrary } from './workoutLibraryDefaults';
 import { withGenerationBackground, generationProgress, subscribeGeneration, cancelBackgroundGeneration } from './generationBackground';
 import { appendExchange } from './chat';
 import { disconnect, isConnected, pullActivitySummaries, pullFitness, signIn } from './garmin';
-import { shareBackup, shareExport } from './exports';
+import { shareBackup, shareExport, shareWorkoutLibrary } from './exports';
 import { decodeBackup } from './backup';
 import { constraintIssues } from './constraints';
 
@@ -43,8 +46,8 @@ function useController() {
           if (!mounted) return;
           setDraft(saved);
           const value = current.current;
-          if (saved && saved.overview.at(-1)?.end === saved.end && saved.signature === generationSignature(value, saved.request)) {
-            const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: saved.start, end: saved.end, rules: value.settings.rules, workouts: saved.workouts, overview: saved.overview }, value.event!, value.settings.rules);
+          if (saved && saved.overview.at(-1)?.end === saved.end && saved.signature === generationSignature(value, saved.request, saved.pipeline === 'library')) {
+            const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: saved.start, end: saved.end, rules: value.settings.rules, workouts: saved.workouts, overview: saved.overview, strategy: saved.outline?.strategy, progressions: saved.outline?.progressions, constraintDecisions: saved.outline?.constraintDecisions }, value.event!, value.settings.rules);
             setReview({ kind: 'proposal', plan });
           }
         }).catch(e => { if (mounted) setError(e instanceof Error ? e.message : 'Saved generation could not load.'); });
@@ -56,9 +59,9 @@ function useController() {
       catch (e) { if (mounted) { setDraftError(true); setError(e instanceof Error ? e.message : 'Generation draft could not load.'); } }
       if (mounted) {
         current.current = value; setState(value); setDraft(savedDraft); setReady(true);
-        if (savedDraft?.overview.at(-1)?.end === savedDraft?.end && savedDraft && savedDraft.signature === generationSignature(value, savedDraft.request)) {
+        if (savedDraft?.overview.at(-1)?.end === savedDraft?.end && savedDraft && savedDraft.signature === generationSignature(value, savedDraft.request, savedDraft.pipeline === 'library')) {
           try {
-            const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: savedDraft.start, end: savedDraft.end, rules: value.settings.rules, workouts: savedDraft.workouts, overview: savedDraft.overview }, value.event!, value.settings.rules);
+            const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: savedDraft.start, end: savedDraft.end, rules: value.settings.rules, workouts: savedDraft.workouts, overview: savedDraft.overview, strategy: savedDraft.outline?.strategy, progressions: savedDraft.outline?.progressions, constraintDecisions: savedDraft.outline?.constraintDecisions }, value.event!, value.settings.rules);
             setReview({ kind: 'proposal', plan });
           } catch { setDraftError(true); setError('Saved proposal failed validation. Discard the draft before restarting.'); }
         }
@@ -81,6 +84,10 @@ function useController() {
   const available = ready && !busy && !recovery;
   return { state, ready, recovery, busy, error, notice, connected, review, draft, draftError, threadId, available,
     setReview, setThreadId,
+    saveLibrary: (workoutLibrary: string) => run('Saving workout library…', async () => { parseWorkoutLibrary(workoutLibrary); await commit({ ...current.current, settings: { ...current.current.settings, workoutLibrary } }); setNotice('Workout library saved. Your active plan is unchanged.'); }),
+    importLibrary: () => run('Importing workout library…', async () => { const text=await pickMarkdownFile(); if(text===null)return; parseWorkoutLibrary(text); await commit({...current.current,settings:{...current.current.settings,workoutLibrary:text}});setNotice('Workout library imported. Your active plan is unchanged.'); }),
+    exportLibrary: () => run('Exporting workout library…', async () => { await shareWorkoutLibrary(current.current.settings.workoutLibrary); }),
+    resetLibrary: () => run('Restoring starter library…', async () => { await commit({...current.current,settings:{...current.current.settings,workoutLibrary:defaultWorkoutLibrary}});setNotice('Starter workout library restored. Your active plan is unchanged.'); }),
     cancelGeneration: () => { generator.current?.abort(); cancelBackgroundGeneration(); },
     discardDraft: () => run('Discarding generation draft…', async () => { await clearGenerationDraft(); setDraft(null); setDraftError(false); setNotice('Generation draft discarded.'); }),
     rejectReview: () => run('Rejecting proposal…', async () => { if (review?.kind === 'proposal') { await clearGenerationDraft(); setDraft(null); } setReview(null); }),
@@ -108,7 +115,8 @@ function useController() {
       try {
         const key = await getApiKey() ?? '';
         if (!key.trim()) throw new Error('Add your OpenRouter API key in Settings before generating a plan.');
-        const plan = await withGenerationBackground(() => generatePlan(current.current, key, request, text => { setBusy(text); generationProgress(text); }, controller.signal, {
+        const generate = draft && draft.pipeline !== 'library' ? generatePlan : generateLibraryPlan;
+        const plan = await withGenerationBackground(() => generate(current.current, key, request, text => { setBusy(text); generationProgress(text); }, controller.signal, {
           draft, save: async value => { await saveGenerationDraft(value); setDraft(value); },
         }), () => controller.abort());
         // Also checks completed history against the proposal before showing accept.
@@ -121,7 +129,7 @@ function useController() {
       const value = current.current;
       if (review.kind === 'proposal') {
         const issues = constraintIssues(value.settings.constraints, value.settings.rules);
-        if (issues.length) throw new Error(issues.join('\n'));
+        if (issues.length && !review.plan.constraintDecisions?.length) throw new Error(issues.join('\n'));
       }
       const plan = review.kind === 'restore' ? review.plan : acceptProposal(value.plan, review.plan, value.event!, value.settings.rules);
       await commit({ ...value, event: plan.event, plan }); await clearGenerationDraft(); setDraft(null); setReview(null); setNotice('Reviewed plan saved.'); setRecovery(false);
