@@ -39,9 +39,9 @@ function useController() {
     current.current = value; setState(value);
   }
   async function run(label: string, action: () => Promise<void>) {
-    if (locked.current || !ready) return;
+    if (locked.current || !ready) return false;
     locked.current = true; setBusy(label); setError(''); setNotice('');
-    try { await action(); } catch (e) { setError(e instanceof Error ? e.message : 'The operation failed.'); }
+    try { await action(); return true; } catch (e) { setError(e instanceof Error ? e.message : 'The operation failed.'); return false; }
     finally { locked.current = false; setBusy(''); }
   }
   const available = ready && !busy && !recovery;

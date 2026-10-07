@@ -1,31 +1,56 @@
-jest.mock('@preeternal/react-native-cookie-manager', () => ({ __esModule: true, default: { clearAll: jest.fn(), flush: jest.fn() } }));
 jest.mock('../src/storage', () => ({ clearGarminSession: jest.fn(), getGarminSession: jest.fn(), saveGarminSession: jest.fn() }));
-import { mapActivities, pullActivitySummaries, signIn } from '../src/garmin';
-import { clearGarminSession, saveGarminSession } from '../src/storage';
+import { mapActivities, pullActivitySummaries, signIn, isConnected } from '../src/garmin';
+import { clearGarminSession, getGarminSession, saveGarminSession } from '../src/storage';
 const run = { activityId: 1, activityType: { typeKey: 'running' }, startTimeLocal: '2027-04-01', distance: 10000, duration: 3600, averageHR: 140, averageSpeed: 3, elevationGain: 10 };
-const response = (body: unknown) => ({ ok: true, json: async () => body, text: async () => typeof body === 'string' ? body : JSON.stringify(body) });
-describe('AT-26–31: Garmin adapter (mocked; device verification separate)', () => {
-  beforeEach(() => { global.fetch = jest.fn(); });
-  it('maps run/ride metrics, skips other sports, and deduplicates', () => {
-    const result = mapActivities([run, run, { ...run, activityId: 2, activityType: { typeKey: 'cycling' }, avgPower: 180 }, { ...run, activityId: 3, activityType: { typeKey: 'swimming' } }]);
+const response = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
+const credentials = { version: 1, accessToken: 'fixture-access', refreshToken: 'fixture-refresh', clientId: 'fixture-client' };
+describe('Garmin mobile token adapter (mocked; device verification separate)', () => {
+  let saved: string | null;
+  beforeEach(() => {
+    jest.clearAllMocks(); saved = JSON.stringify(credentials); global.fetch = jest.fn();
+    (getGarminSession as jest.Mock).mockImplementation(async () => saved);
+    (saveGarminSession as jest.Mock).mockImplementation(async value => { saved = value; });
+    (clearGarminSession as jest.Mock).mockImplementation(async () => { saved = null; });
+  });
+  it('maps run/ride metrics and deduplicates', () => {
+    const result = mapActivities([run, run, { ...run, activityId: 2, activityType: { typeKey: 'cycling' }, avgPower: 180 }]);
     expect(result).toHaveLength(2); expect(result.find(a => a.id === 1)).toMatchObject({ sport: 'run', distanceKm: 10, durationSeconds: 3600, speedKmh: 10.8 });
     expect(result.find(a => a.id === 2)).toMatchObject({ sport: 'ride', powerW: 180 });
   });
-  it('rejects malformed data instead of replacing cached data', () => { expect(() => mapActivities([{ activityId: 1 }])).toThrow('invalid'); });
-  it('disconnects on expired session', async () => {
-    (fetch as jest.Mock).mockResolvedValue({ ok: false, status: 401 }); await expect(pullActivitySummaries()).rejects.toThrow('expired'); expect(clearGarminSession).toHaveBeenCalled();
+  it('skips unsupported sport records without requiring their distance fields', () => {
+    expect(mapActivities([run, { activityId: 3, activityType: { typeKey: 'yoga' }, distance: null }])).toHaveLength(1);
+  });
+  it('rejects malformed supported activities', () => { expect(() => mapActivities([{ activityId: 1 }])).toThrow('invalid'); });
+  it('uses the mobile API bearer token instead of the old web proxy', async () => {
+    (fetch as jest.Mock).mockResolvedValue(response([run])); await expect(pullActivitySummaries()).resolves.toHaveLength(1);
+    expect((fetch as jest.Mock).mock.calls[0][0]).toContain('https://connectapi.garmin.com/activitylist-service');
+    expect((fetch as jest.Mock).mock.calls[0][1].headers.Authorization).toBe('Bearer fixture-access');
+  });
+  it('refreshes once on 401 and retries with the rotated token', async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce(response({}, 401)).mockResolvedValueOnce(response({ access_token: 'rotated', refresh_token: 'rotated-refresh' })).mockResolvedValueOnce(response([run]));
+    await expect(pullActivitySummaries()).resolves.toHaveLength(1);
+    expect((fetch as jest.Mock).mock.calls[2][1].headers.Authorization).toBe('Bearer rotated'); expect(saved).toContain('rotated-refresh');
+  });
+  it('disconnects on rejected refresh without overwriting activity data', async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce(response({}, 401)).mockResolvedValueOnce(response({}, 400));
+    await expect(pullActivitySummaries()).rejects.toThrow('refresh'); expect(await isConnected()).toBe(false);
+  });
+  it('keeps the session on transient forbidden or server errors', async () => {
+    (fetch as jest.Mock).mockResolvedValue(response({}, 403)); await expect(pullActivitySummaries()).rejects.toThrow('403'); expect(await isConnected()).toBe(true);
   });
   it('does not make calls without credentials', async () => { await expect(signIn('', '')).rejects.toThrow('email'); expect(fetch).not.toHaveBeenCalled(); });
-  it('proves authenticated endpoint access before saving a session', async () => {
-    (fetch as jest.Mock).mockResolvedValueOnce(response('<input value="csrf" name="_csrf">')).mockResolvedValueOnce(response('ok')).mockResolvedValueOnce(response([run]));
-    await signIn('athlete@example.com', 'password'); expect(fetch).toHaveBeenCalledTimes(3); expect(saveGarminSession).toHaveBeenCalled();
+  it('exchanges the service ticket and verifies the profile before saving tokens', async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce(response({ responseStatus: { type: 'SUCCESSFUL' }, serviceTicketId: 'ST-fixture' }))
+      .mockResolvedValueOnce(response({ access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600 }))
+      .mockResolvedValueOnce(response({ displayName: 'fixture-profile' }));
+    await signIn('athlete@example.com', 'fixture-password'); expect(fetch).toHaveBeenCalledTimes(3);
+    expect((fetch as jest.Mock).mock.calls[0][0]).toContain('/mobile/api/login');
+    expect((fetch as jest.Mock).mock.calls[1][0]).toContain('diauth.garmin.com');
+    expect((fetch as jest.Mock).mock.calls[2][0]).toContain('/userprofile-service/socialProfile'); expect(saved).toContain('new-access');
   });
-  it('consumes the SSO ticket at Garmin before checking activity access', async () => {
-    (fetch as jest.Mock).mockResolvedValueOnce(response('<input value="csrf" name="_csrf">'))
-      .mockResolvedValueOnce(response('https://untrusted.invalid/?ticket=ST-fixture'))
-      .mockResolvedValueOnce(response('Connect')).mockResolvedValueOnce(response([run]));
-    await signIn('athlete@example.com', 'password');
-    expect((fetch as jest.Mock).mock.calls[2][0]).toBe('https://connect.garmin.com/modern/?ticket=ST-fixture');
-    expect((fetch as jest.Mock).mock.calls[3][0]).toContain('activitylist-service');
+  it('does not accept legacy cookie metadata as a current session', async () => { saved = JSON.stringify({ signedInAt: 'yesterday' }); expect(await isConnected()).toBe(false); });
+  it('reports credential rejection without saving a session', async () => {
+    (fetch as jest.Mock).mockResolvedValue(response({ responseStatus: { type: 'INVALID_USERNAME_PASSWORD' } }));
+    await expect(signIn('athlete@example.com', 'fixture-password')).rejects.toThrow('credentials'); expect(saved).toBeNull();
   });
 });

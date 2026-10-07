@@ -6,7 +6,7 @@ A local-first personal trainer for running and cycling, built with Expo, React N
 
 The app now includes Plan, Chat, and Settings; goal/guidance imports; rolling seven-day views; plan validation and review; OpenRouter coaching; ten conversation threads; SQLite persistence on Android; exports; and versioned plan backup/restore. A browser preview uses local browser storage and memory-only API keys.
 
-Strict type checking, 62 automated tests, and web export passed in GitHub CI after the reboot on 7 October 2026. The native Android APK built successfully and its signature verified; phone and real-service testing remain open. See [verification status](TESTING.md).
+The owner verified Android installation, OpenRouter chat with Claude Sonnet 4.6, and Markdown imports. The 0.1.1 fixes pass strict checking, 72 automated tests, and web export. Phone rechecks of the keyboard, Garmin connection/sync, and full plan generation remain open. See [verification status](TESTING.md).
 
 Garmin sign-in and sync are implemented behind an isolated native adapter but have **not been verified with a real account/device**. The current adapter fetches up to 100 recent running/cycling summaries, including optional HR, speed, elevation, power, and cadence. Lap detail, zones, fitness/load, and recovery endpoints are not implemented yet. Missing metrics remain unknown. Garmin workout push is deferred. Native iOS and Ona are out of scope.
 
@@ -21,7 +21,7 @@ pnpm test
 pnpm web
 ```
 
-For Android development, use a development build rather than Expo Go because the Garmin cookie adapter requires native code:
+For Android development, use a development build rather than Expo Go because SQLite and secure storage require native code:
 
 ```powershell
 pnpm android
@@ -41,14 +41,14 @@ pnpm build:android
 
 The bootstrap script downloads the JDK and Google command-line tools into ignored `.tools/` and prompts for SDK license review. Use `-AcceptLicenses` only after explicitly authorizing acceptance. The build runs in the workspace and outputs `artifacts/stride-ai-release.apk`.
 
-The pnpm 11 dependency layout is configured in `pnpm-workspace.yaml` ([pnpm migration guide](https://pnpm.io/docs/migration)). On Windows, the build script temporarily maps an unused drive letter to an SDK path containing spaces, avoiding CMake's incorrect short-name treatment of `clang++.exe`. It places native caches under that short SDK path and removes only its own mapping afterward. To retry Gradle without regenerating the native project, pass `-SkipPrebuild` to `scripts/build-android.ps1`.
+The pnpm 11 dependency layout is configured in `pnpm-workspace.yaml` ([pnpm migration guide](https://pnpm.io/docs/migration)). On Windows, the build script temporarily maps an unused drive letter to an SDK path containing spaces, avoiding CMake's incorrect short-name treatment of `clang++.exe`. It also maps the Gradle cache to an unused drive letter and places native caches under the short SDK path and removes only its own mapping afterward. Phone builds include ARM64 and ARMv7. Pass `-Architectures "arm64-v8a,armeabi-v7a,x86,x86_64"` for emulator binaries. To retry Gradle without regenerating the native project, pass `-SkipPrebuild` to `scripts/build-android.ps1`.
 
 The generated release variant uses the template debug certificate for personal testing only. Keep the same signing identity when upgrading; do not uninstall first if you want to preserve data. Production distribution needs a private release keystore. APK installation/upgrade on the owner's phone remains a separate acceptance check.
 
 ## First use
 
 1. In Settings, load the project goal, research, and constraints, or import your own .md/.txt files.
-2. Configure an OpenRouter model and API key, then save settings. Native keys are stored in SecureStore. The default model is anthropic/claude-sonnet-4.6; generation requires structured-output support.
+2. Configure an OpenRouter model and API key, then save settings. Native keys are stored in SecureStore. The default model is anthropic/claude-sonnet-4.6; generation uses structured output when supported and otherwise requests JSON with the same local validation.
 3. Save Garmin email/password, connect, and sync activities on Android. An error leaves the cache intact; a session error requires reauthentication.
 4. Generate your plan from Plan. Longer plans are generated in seven-day batches; progress and cancellation are available. No partial plan is activated. Review the proposed sessions before accepting.
 5. Use Chat for advice. To change the plan, enter a request and select Propose plan changes, then review it on Plan.
@@ -56,7 +56,9 @@ The generated release variant uses the template debug certificate for personal t
 
 Ten chats means ten conversation threads ordered by recent use. The oldest is removed when a new thread would exceed ten. Workout completion is manual.
 
-The native Garmin adapter consumes the SSO service ticket before verifying activity access, following the [maintained client session flow](https://github.com/cyberjunky/python-garminconnect/blob/master/garminconnect/client.py). This consumer interface still requires testing with the owner's account.
+The native Garmin adapter now uses the [maintained client's mobile service-ticket/token flow](https://github.com/cyberjunky/python-garminconnect/blob/master/garminconnect/client.py) and `connectapi.garmin.com` bearer authentication. It verifies profile access before saving tokens in SecureStore and refreshes an expired access token once. Reconnect after upgrading from the old web-cookie adapter. This replacement still requires testing with the owner's account.
+
+Chat keeps its composer below the scrolling messages and resizes around the Android keyboard. A successful, saved response clears the submitted draft; failures retain it. Multiline fields have a bounded height and an internal scroll indicator. Operations automatically reveal progress/errors at the top of the page. Plan generation retries a weekly response up to twice for validation repairs and supports a locally validated JSON prompt fallback when a provider cannot accept structured output.
 
 ## Goal and scheduling rules
 

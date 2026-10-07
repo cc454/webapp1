@@ -2,6 +2,12 @@
 
 Updated 7 October 2026 after recovery from a reboot. Passing automated cases are evidence for the named logic, not proof of native device behavior or real-service compatibility.
 
+## Phone feedback and 0.1.1 fixes
+
+The owner confirmed 0.1.0 installs/launches, OpenRouter and chat work with `anthropic/claude-sonnet-4.6`, and Markdown loading works. Garmin failed with “Garmin returned unreadable activity data”; full plan generation produced no visible feedback. Keyboard avoidance, draft clearing, and large settings fields were also reported.
+
+The 0.1.1 update replaces the web-cookie Garmin transport with mobile token authentication and refresh, skips unsupported sports before checking metric fields, pins the chat composer, clears only successful submitted drafts, bounds multiline fields with scrolling, and reveals progress/errors automatically. Plan generation uses a portable schema, a bounded JSON fallback, and two bounded repair attempts per week. Strict TypeScript and all 72 tests across 13 suites pass locally. The refreshed web export passes. Android upgrade, keyboard behavior, Garmin account access/sync, and a full event-length plan need owner retesting.
+
 ## Executed checks
 
 - Strict TypeScript: passed (`pnpm typecheck`).

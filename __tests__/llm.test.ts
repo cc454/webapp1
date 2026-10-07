@@ -30,6 +30,21 @@ describe('AT-07,19–24,40: OpenRouter', () => {
     (fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: 'partial' }, finish_reason: 'length' }] }) });
     await expect(completion('key', 'model', [])).rejects.toThrow('incomplete');
   });
+  it('falls back from unavailable structured output to locally validated JSON', async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 400 }).mockResolvedValueOnce(response('{"value":1}'));
+    await expect(completion('key', 'model', [], { type: 'object' })).resolves.toBe('{"value":1}');
+    const fallback = JSON.parse((fetch as jest.Mock).mock.calls[1][1].body);
+    expect(fallback.response_format).toBeUndefined(); expect(fallback.messages[0].content).toContain('Return only a JSON object');
+  });
+  it('repairs an invalid weekly response before offering a proposal', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2027-04-05T12:00:00Z'));
+    const state = emptyState(); state.event = fixturePlan().event;
+    const invalid = fixturePlan(); invalid.workouts.pop();
+    (fetch as jest.Mock).mockResolvedValueOnce(response(JSON.stringify(invalid))).mockResolvedValueOnce(response(JSON.stringify(fixturePlan())));
+    const progress = jest.fn(); const result = await generatePlan(state, 'key', '', progress);
+    expect(result.workouts).toHaveLength(7); expect(fetch).toHaveBeenCalledTimes(2); expect(state.plan).toBeNull();
+    expect(progress).toHaveBeenCalledWith('Repairing week 1 (1/2)…'); jest.useRealTimers();
+  });
   it('assembles a validated proposal without altering saved state', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2027-04-05T12:00:00Z'));
     const state = emptyState(); state.event = fixturePlan().event;

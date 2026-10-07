@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, Switch, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { useApp } from './appContext';
 import { Button, Card, colors, Field, s } from './ui';
 import { addDays, duration, pace, today } from './dates';
@@ -8,19 +8,21 @@ import { isTruncated } from './llm';
 import { rulesSchema } from './types';
 import { constraintIssues } from './constraints';
 
-export function Page({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+export function Page({ title, subtitle, children, footer }: { title: string; subtitle: string; children: React.ReactNode; footer?: React.ReactNode }) {
   const app = useApp();
-  return <ScrollView style={s.page} keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
+  const scroll = useRef<ScrollView>(null);
+  useEffect(() => { if (app.busy || app.error || app.notice) scroll.current?.scrollTo({ y: 0, animated: true }); }, [app.busy, app.error, app.notice]);
+  return <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView ref={scroll} style={s.page} keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
     <Text style={s.eyebrow}>STRIDE / PERSONAL TRAINING</Text><Text style={s.title}>{title}</Text><Text style={s.muted}>{subtitle}</Text>
     {!app.ready && <ActivityIndicator color={colors.accent} />}
-    {!!app.busy && <Card><View style={s.row}><ActivityIndicator color={colors.accent} /><Text style={s.body}>{app.busy}</Text></View>{app.busy.startsWith('Generating') && <Button title="Cancel generation" secondary onPress={app.cancelGeneration} />}</Card>}
+    {!!app.busy && <Card><View style={s.row}><ActivityIndicator color={colors.accent} /><Text style={s.body}>{app.busy}</Text></View>{/^(Generating|Repairing)/.test(app.busy) && <Button title="Cancel generation" secondary onPress={app.cancelGeneration} />}</Card>}
     {!!app.error && <Card><Text accessibilityRole="alert" style={s.error}>{app.error}</Text></Card>}
     {!!app.notice && <Text accessibilityRole="alert" style={{ ...s.body, color: colors.accent }}>{app.notice}</Text>}
     {app.recovery && <Card><Text style={s.body}>Saved data needs recovery. Restore a valid plan backup or explicitly reset local plan and chat data.</Text><Button title="Restore backup" onPress={app.restore} disabled={!!app.busy} /></Card>}
     {Platform.OS === 'web' && <Text style={s.muted}>Browser preview · Garmin requires Android. Your API key stays in memory for this session; local data belongs to this browser and does not sync between devices.</Text>}
     {isTruncated(app.state) && <Text style={s.error}>Guidance exceeds the request limit. Only the first 20,000 characters of each document will be sent; originals remain saved.</Text>}
     {children}
-  </ScrollView>;
+  </ScrollView>{footer && <View style={s.composer}>{footer}</View>}</KeyboardAvoidingView>;
 }
 function Review() {
   const app = useApp(); const [expanded, setExpanded] = useState(false);
@@ -65,12 +67,16 @@ export function PlanScreen() {
 export function ChatScreen() {
   const app = useApp(); const [question, setQuestion] = useState('');
   const thread = app.state.threads.find(t => t.id === app.threadId);
-  return <Page title="Talk to your coach" subtitle="Reflect on training. Review the next step.">
+  async function send() {
+    const sent = question;
+    if (await app.chat(sent)) setQuestion(value => value === sent ? '' : value);
+  }
+  const composer = <Card><Field label="What would you like to discuss?" multiline style={{ height: 80 }} value={question} onChangeText={setQuestion} placeholder="How should I adjust after a missed session?" /><View style={s.row}><Button title="Send message" onPress={send} disabled={!app.available || !question.trim()} /><Button title="Propose plan changes" secondary onPress={() => app.generate(question)} disabled={!app.available || !app.state.plan || !question.trim() || !!app.review} /></View><Text style={s.muted}>A plan-change proposal appears for review on Plan. Only accepted changes are saved.</Text></Card>;
+  return <Page title="Talk to your coach" subtitle="Reflect on training. Review the next step." footer={composer}>
     <Card><Text style={s.muted}>Coaching sends event, plan, guidance, relevant messages, and Garmin summaries through OpenRouter to your selected model provider. Credentials are excluded. Advice does not change your saved plan.</Text><Text style={s.label}>{app.state.settings.model}</Text></Card>
     <View style={s.row}><Button title="New conversation" secondary onPress={() => app.setThreadId(null)} disabled={!app.available} /></View>
     {app.state.threads.length > 0 && <Card><Text style={s.eyebrow}>RECENT CONVERSATIONS / {app.state.threads.length} OF 10</Text>{app.state.threads.map(t => <Button key={t.id} title={t.title} secondary onPress={() => app.setThreadId(t.id)} disabled={!app.available} />)}</Card>}
     {thread?.messages.map((m, i) => <Card key={i}><Text style={s.eyebrow}>{m.role === 'user' ? 'YOU' : 'COACH'}</Text><Text selectable style={s.body}>{m.content}</Text></Card>)}
-    <Card><Field label="What would you like to discuss?" multiline value={question} onChangeText={setQuestion} placeholder="How should I adjust after a missed session?" /><View style={s.row}><Button title="Send message" onPress={() => app.chat(question)} disabled={!app.available || !question.trim()} /><Button title="Propose plan changes" secondary onPress={() => app.generate(question)} disabled={!app.available || !app.state.plan || !question.trim() || !!app.review} /></View><Text style={s.muted}>A plan-change proposal appears for review on Plan. Only accepted changes are saved.</Text></Card>
   </Page>;
 }
 export function SettingsScreen() {
@@ -89,7 +95,7 @@ export function SettingsScreen() {
   }
   return <Page title="Your training setup" subtitle="Local data. Your accounts. Your choices.">
     {!!localError && <Text style={s.error}>{localError}</Text>}
-    <Card><Text style={s.heading}>OpenRouter</Text><Field label="Model identifier" value={draft.model} onChangeText={model => setDraft({ ...draft, model })} autoCapitalize="none" /><Field label="OpenRouter API key (blank retains saved key)" value={key} onChangeText={setKey} secureTextEntry autoCapitalize="none" autoCorrect={false} /><Text style={s.muted}>Plan generation requires a model supporting structured JSON responses. {Platform.OS === 'web' ? 'Browser key is memory-only.' : 'The key is encrypted on this device.'}</Text><Button title="Remove saved API key" secondary onPress={app.removeKey} disabled={!app.available} /></Card>
+    <Card><Text style={s.heading}>OpenRouter</Text><Field label="Model identifier" value={draft.model} onChangeText={model => setDraft({ ...draft, model })} autoCapitalize="none" /><Field label="OpenRouter API key (blank retains saved key)" value={key} onChangeText={setKey} secureTextEntry autoCapitalize="none" autoCorrect={false} /><Text style={s.muted}>Plan generation validates JSON responses; models without structured output use a JSON prompt fallback. {Platform.OS === 'web' ? 'Browser key is memory-only.' : 'The key is encrypted on this device.'}</Text><Button title="Remove saved API key" secondary onPress={app.removeKey} disabled={!app.available} /></Card>
     <Card><Text style={s.heading}>Event goal</Text><Text style={s.muted}>Import goal.md with name, date, distance (km), target time (H:MM), and elevation (m). Pace is calculated.</Text><View style={s.row}><Button title="Import goal.md" secondary onPress={() => app.loadContent('goal', false)} disabled={!app.available || !!app.review} /><Button title="Load project goal" secondary onPress={() => app.loadContent('goal', true)} disabled={!app.available || !!app.review} /></View></Card>
     <Card><Text style={s.heading}>Garmin Connect</Text><Text style={s.muted}>{app.connected ? 'Connected' : 'Disconnected'} · Last sync: {app.state.lastSync ? new Date(app.state.lastSync).toLocaleString('en-GB') : 'Never'}</Text><Field label="Garmin email" value={draft.garminEmail} onChangeText={garminEmail => setDraft({ ...draft, garminEmail })} autoCapitalize="none" keyboardType="email-address" /><Field label="Garmin password (blank retains saved password)" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} /><Text style={s.muted}>Save settings before connecting. Android sign-in and sync need device verification. Up to 100 recent activities are fetched; zones, recovery, and fitness metrics are currently unknown.</Text><View style={s.row}><Button title="Connect Garmin" secondary onPress={app.connect} disabled={!app.available || Platform.OS === 'web'} /><Button title="Sync activities" onPress={app.sync} disabled={!app.available || Platform.OS === 'web'} /><Button title="Disconnect" secondary onPress={app.disconnect} disabled={!app.available || Platform.OS === 'web'} /></View><Text style={s.muted}>{app.state.activities.length} cached running/cycling activities</Text></Card>
     <Card><Text style={s.heading}>Enforced schedule</Text><Field label="Minimum rest days per complete seven-day block" value={restDays} onChangeText={setRestDays} keyboardType="number-pad" /><Field label="Monday maximum minutes" value={monday} onChangeText={setMonday} keyboardType="number-pad" /><View style={s.row}><Switch value={draft.rules.weekendLong} onValueChange={weekendLong => setDraft({ ...draft, rules: { ...draft.rules, weekendLong } })} /><Text style={s.body}>Long sessions on weekends</Text></View><View style={s.row}><Switch value={draft.rules.noConsecutiveHard} onValueChange={noConsecutiveHard => setDraft({ ...draft, rules: { ...draft.rules, noConsecutiveHard } })} /><Text style={s.body}>No consecutive hard days</Text></View><Text style={s.muted}>Rest quotas use seven-day blocks from plan creation. The final partial block has no quota. Additional guidance below is sent to the coach; only these explicit rules are enforced automatically.</Text></Card>
