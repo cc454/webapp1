@@ -1,70 +1,75 @@
-# Stride AI requirements
+# Stride AI requirements and acceptance tests
 
-## Product purpose
+Updated 7 October 2026 from the owner's decisions. This defines target behavior, not currently implemented features.
 
-Stride AI is a privacy-conscious, local-first mobile personal trainer for an athlete preparing for a target endurance event over a 16-week plan. The app must run as an Expo application on Android and iOS, with Android release APK builds available from Ona.
+## Scope
 
-## Functional requirements
+Personal local-first Expo Android app for running and cycling. AI generates a plan from creation through the goal.md event date. Initial plans and every proposed change require review and explicit acceptance. Garmin sync is required and on demand. Web access and Garmin workout push are optional. Native iOS and Ona are out of scope.
 
-### Training plan
+Each requirement has a matching AT test specification below. These cases must be implemented or executed during development; they are not claims of passing tests. Required rows gate Android delivery; optional rows gate only their feature. Use automated fixtures for logic and physical-device checks for native behavior.
 
-1. Display an active target event with name, date, distance, target time, elevation, and target pace.
-2. Show a seven-day training plan containing date, title, details, duration, workout type, and completion state for every workout.
-3. Let the athlete toggle a workout's completion state.
-4. Provide a 16-week macro plan with week number, phase, volume, and focus.
-5. Persist the active plan, event, and non-secret settings on the device.
+Working interpretations: ten chats means ten conversation threads with their messages; completion is manual initially; next seven days means today and the following six local calendar days. Plan creation/event dates are inclusive. These interpretations can be amended.
 
-### Event, research, and constraints content
+## Required behavior and verification
 
-6. Import a `goal.md` or plain-text file and parse all six required event fields: name, date, distance, target time, elevation, and pace.
-7. Reject an invalid goal document and identify missing fields.
-8. Load bundled `goal.md`, `research.md`, and `constraints.md` files from the application assets.
-9. Import research and constraints Markdown or plain-text files from the device.
-10. Allow research and constraints text to be edited in the app and persisted locally.
+| ID | Requirement | Test case |
+| --- | --- | --- |
+| R-01 | Deliver a personal-use Android app with no multi-user account or hosted app-backend dependency. | AT-01: Install on Android, launch without an app account, and use a saved plan offline; inspect architecture for backend dependencies. |
+| R-02 | Distinguish running, cycling, and rest; support sport-appropriate metric distance, pace/speed, and available HR/power targets. | AT-02: Load run/ride/rest fixtures; verify type, targets, units, and persisted sport identity. |
+| R-03 | Use imported or bundled goal.md as the event source; display name, date, distance, target time, elevation, and calculated pace. | AT-03: Load training/goal.md; compare the event to that file and verify no hardcoded 50K substitution. |
+| R-04 | Import Markdown/plain-text goals requiring name, valid date, positive distance/time, and nonnegative elevation; identify invalid/missing fields without replacing the active goal. | AT-04: Import valid .md/.txt, each missing-field fixture, impossible dates, zero/negative time/distance, and negative elevation; verify errors and unchanged state on failure. |
+| R-05 | Calculate pace from time/distance. Target time is hours:minutes, optionally hours:minutes:seconds; legacy pace cannot override the calculation. | AT-05: Import 21.1 km, 2:00, and legacy 5:30/km; expect rounded 5:41/km. Verify seconds support and malformed-time rejection. |
+| R-06 | Reject past events with an explanation; never silently change the goal date. | AT-06: Freeze today at 2026-10-07; reject bundled 2026-04-11, accept today/future dates, and verify no date substitution. |
+| R-07 | AI must generate the initial personalized plan using event, available Garmin baseline, research, and constraints. | AT-07: Capture generation requests with distinctive fixtures for each input; verify all appear and response becomes a reviewable proposal. |
+| R-08 | Plan span is creation date through event date inclusive with no fixed 16-week limit. | AT-08: Generate same-day, 10-day, 16-week, and 24-week plans across month/year boundaries; verify complete coverage and no sessions outside the span. |
+| R-09 | Show today plus six days, including rest/no-session days and the event if in range. | AT-09: Freeze a Wednesday and a month boundary; verify exactly seven ordered dates; after the event show no invented training. |
+| R-10 | Show date, title, details, duration, sport/type, and completion for each workout. | AT-10: Render representative run/ride sessions, long durations, and both completion states; verify every field. |
+| R-11 | Allow manual completion/uncompletion and persist it. | AT-11: Toggle twice with a restart after each toggle; verify saved state. |
+| R-12 | Show the full variable-length overview with dated weeks/partial weeks, phase, sport-specific volume, and focus. | AT-12: Render 10-day and 24-week plans; verify exact interval coverage, partial weeks, and separate running/cycling volumes. |
+| R-13 | Enforce scheduling constraints during proposal validation; surface conflicting/ambiguous rules and block unresolved violations. | AT-13: Test two rest days per full seven-day block, weekend long sessions, no consecutive hard sessions, and Monday at most 40 minutes; reject violations and impossible schedules. Flag unresolved partial-block rules. |
+| R-14 | Require review and accept/reject for initial plans and all changes; arrival of AI text must not change active state. | AT-14: Compare state before review, after rejection, and after acceptance for initial and revised plans; only acceptance activates changes. |
+| R-15 | Show differences/errors, block invalid proposals, and preserve completed history when revising future workouts. | AT-15: Review valid/invalid revisions with completed workouts; verify diff, validation, blocked invalid acceptance, and retained completed history. |
+| R-16 | Persist plan, event, completion, cached Garmin data, settings, guidance, and chats locally; recover gracefully from corrupt/incompatible state. | AT-16: Restart populated state and compare values; load corrupt/unsupported fixtures and verify useful recovery without crash or silent overwrite. |
+| R-17 | Load bundled goal/research/constraints from assets actually packaged in the app. | AT-17: Load each on a fresh Android install and compare source content; verify useful missing-asset error. |
+| R-18 | Import/edit research and constraints as Markdown/plain text, persist edits, and preserve content on cancelled imports. | AT-18: Import both formats, edit, restart, then cancel import; verify content and persistence. |
+| R-19 | Support Claude and Gemini with separately retained provider API keys in secure storage. | AT-19: Configure both, switch/restart, and capture requests; verify correct key and absence from ordinary state. |
+| R-20 | Coaching context includes event, plan, guidance, relevant retained messages, and available Garmin athlete/activity metrics. | AT-20: Capture payloads with distinct context fixtures; verify inclusion and unknown status for unavailable metrics. |
+| R-21 | Include at most 20,000 characters each of research and constraints per request; notify of truncation and preserve full local originals. | AT-21: Submit above/below-limit documents; inspect payload lengths, notice, and stored originals. |
+| R-22 | Request coaching/generation directly from the selected provider; display responses or useful authentication/network/timeout/quota/malformed-response errors. | AT-22: Exercise both providers for success and each failure; verify feedback, cleared busy state, and unchanged active plan on failure. |
+| R-23 | Make no provider request without a key; explain configuration. | AT-23: Attempt chat/generation with absent/blank keys; assert zero provider calls and Settings guidance. |
+| R-24 | Instruct the coach not to diagnose injury and to recommend medical evaluation for concerning symptoms. | AT-24: Inspect both provider system instructions; display a pain-concern fixture without saving an unreviewed change. |
+| R-25 | Retain the latest ten chat threads and their messages locally, with ability to resume them. | AT-25: Create eleven threads, restart, and verify newest ten; resume one and verify earlier messages and new reply persist. |
+| R-26 | Authenticate the owner's non-MFA Garmin account through an isolated native adapter; report bad credentials or unavailable sessions. | AT-26: Verify real Android login plus bad-credential/no-session fixtures; show connected only on validated success. |
+| R-27 | Securely store Garmin password/session metadata; keep password input blank after saving; empty input retains password and a new value replaces it. | AT-27: Save/reopen/save blank/replace; verify display and secure values without plaintext state/log leakage. |
+| R-28 | Provide on-demand Garmin sync, last-success time, and cached offline data; background sync is not required. | AT-28: Sync then restart offline; verify cache/time and no scheduled background-sync dependency. |
+| R-29 | Sync available run/ride ID, sport, name, start time, distance, duration, average HR, pace/speed, elevation, power, cadence, and lap data. | AT-29: Map full/partial run/ride fixtures; verify conversions, deduplication, sport display, and no fabricated optional values. |
+| R-30 | Use available Garmin athlete data for baseline: history/volume, longest sessions, zones, fitness/load, and recovery where retrievable. Document supported fields; mark unavailable data unknown. | AT-30: Test full/partial fixtures and inspect planning context; compare supported-field inventory to real-account sync, verifying unknown fields stay unknown. |
+| R-31 | Disconnect expired/unauthorized sessions, require reauthentication, report sync failures accurately, and preserve successful cached data. | AT-31: Simulate 401/403, network failure, and malformed data; verify status/errors, unchanged success timestamp, and retained cache. |
+| R-32 | Show busy feedback and prevent duplicate sync, generation, acceptance, restore, and export operations. | AT-32: Repeatedly activate each delayed operation; verify one invocation, disabled/busy state, and recovery on success/failure. |
+| R-33 | Export the displayed next seven days as Markdown, PDF, and iCalendar using actual dates and metric values. | AT-33: Export December/January fixtures; compare text/PDF to view and import .ics into a calendar to check dates. |
+| R-34 | Use safe event-derived filenames, escaped PDF HTML/calendar text, and stable unique calendar IDs. | AT-34: Export path characters, HTML, commas, semicolons, and newlines; verify safe paths, literal text, valid calendar, and stable distinct IDs. |
+| R-35 | Use device sharing when available; otherwise provide a usable save/export fallback or actionable explanation. | AT-35: Share each format on Android; simulate unavailable sharing and verify fallback. |
+| R-36 | Back up the current plan in a portable versioned file with event, dates, overview, workouts, and completion; exclude secrets and chat history. | AT-36: Inspect populated backup for all plan fields and absence of credential/session/chat sentinels. |
+| R-37 | Preview restore and require explicit acceptance; invalid/incompatible backups leave current plan unchanged. Preserve device credentials/settings/chats. | AT-37: Round-trip backup, reject preview, and test corrupt/unsupported files; verify atomic accepted replacement and unchanged unrelated data. |
+| R-38 | Provide Plan/Chat/Settings navigation and reachable controls for proposals, sync, provider setup, imports, exports, backup, and restore. | AT-38: Follow each primary Android flow and verify reachability/navigation. |
+| R-39 | Use English, metric units, and minimalist dark styling with readable text and clear error/loading/disabled states. | AT-39: Review screens/proposals on small/large Android displays; verify English, km/metres, pace per km, cycling km/h, dark styling, and legible feedback. |
+| R-40 | Keep data local except explicit Garmin communication and selected context sent to the chosen AI provider; never send Garmin secrets to AI. | AT-40: Capture sync/coaching/offline/backup traffic; verify destinations and no Garmin secret sentinels in provider requests. |
+| R-41 | Explain AI context sharing; exclude secrets from ordinary state, logs, exports, and backups; encrypt API keys/passwords/session metadata. | AT-41: Review disclosure; inspect state/logs/outputs with secret sentinels; verify Android secure storage for each secret. |
+| R-42 | Pass strict TypeScript checking. | AT-42: Run documented typecheck command on a clean checkout; require strict configuration and zero exit code. |
+| R-43 | Maintain automated tests for dates/constraints, generation/review, providers, storage, imports, exports, backup/restore, chats, Garmin, and primary UI flows. | AT-43: Run documented test command; require passing meaningful cases for each area and traceability to AT IDs. |
+| R-44 | Document reproducible Android builds independent of Ona: prerequisites, commands, signing, and output artifacts/stride-ai-release.apk. | AT-44: Follow README in a clean non-Ona environment; build and verify APK at the stated path. |
+| R-45 | Document testing-only signing if used and verify installation/upgrades preserving data on the owner's device. | AT-45: Compare APK signing to documentation; install, populate data, and upgrade with same signing identity; verify preserved plan/chats/settings. |
 
-### Coaching
+## Optional enhancements
 
-11. Support Claude (Anthropic) and Gemini as selectable coaching providers.
-12. Store the chosen provider's API key in device secure storage.
-13. Build coaching context from the active event, research, constraints, current week, and recent Garmin activity summaries.
-14. Limit research and constraints content included in a coaching request to 20,000 characters each.
-15. Send a coaching prompt directly to the selected provider and show the returned text or a useful error.
-16. Do not make a network request when no API key is configured; explain how to configure one.
-17. Instruct the coach not to diagnose injury and to recommend medical evaluation for concerning symptoms.
+| ID | Requirement | Test case |
+| --- | --- | --- |
+| R-46 | Offer responsive browser planning/chat/review/backup on phones, tablets, and desktops. Disclose browser storage/security and unsupported native features; no implied cross-device sync. | AT-46: Exercise core flows at representative browser sizes; verify native-feature fallback and documented browser credential policy. |
+| R-47 | Explicitly push accepted run/ride workouts with correct sport, structured steps/targets/durations, and dates to Garmin; skip rest. | AT-47: Push run/ride interval/rest fixtures; inspect payloads and real-account entries, including a 2h 30m session. |
+| R-48 | Report per-workout push failures and retry without duplicating successes; accepting a plan alone never pushes it. | AT-48: Fail mid-push and retry; verify recorded remote IDs prevent duplicate successes, errors remain visible, and acceptance makes no push request. |
 
-### Garmin integration
+## Known input issue and implementation decisions
 
-18. Store Garmin passwords and Garmin session metadata in device secure storage.
-19. Authenticate with Garmin Connect using the native cookie store and report invalid credentials or unavailable sessions.
-20. Sync recent Garmin activities, mapping name, start time, distance, duration, average heart rate, and average pace.
-21. Treat expired or unauthorized Garmin sessions as disconnected and require reauthentication.
-22. Push every non-rest workout as a structured Garmin running workout and create its matching calendar entry.
-23. Report Garmin failures rather than claiming that a sync or calendar push succeeded.
+training/goal.md specifies Halbmarathon, 21.1 km, 2:00, 10 m elevation, on 11 April 2026. The date is past; preserve it until the owner supplies a replacement. Legacy 5:30/km is superseded by computed 5:41/km. No event date has been invented.
 
-### Exports
-
-24. Export the current week as Markdown, PDF, or iCalendar (`.ics`).
-25. Use a safe event-derived filename for Markdown and calendar exports.
-26. Use the device share sheet when sharing is available.
-
-### User interface
-
-27. Provide Plan, Chat, and Settings navigation.
-28. Provide controls to connect Garmin, sync activities, push the week to Garmin, import/load content, choose a provider, and export the plan.
-29. Show a busy state while Garmin actions are in progress and prevent duplicate actions.
-30. Keep the Garmin password field blank after entry; entering a value replaces the securely stored password.
-
-## Privacy and security requirements
-
-31. Keep plan state, event data, imported Markdown, and workout completion state on the device.
-32. Keep API keys, Garmin passwords, and Garmin session metadata in encrypted device storage.
-33. Only send the selected coaching context to the user-selected LLM provider.
-34. Never include Garmin passwords or session tokens in coaching context or provider requests.
-
-## Quality and delivery requirements
-
-35. TypeScript must pass strict type checking.
-36. Unit tests must cover application modules, provider request handling, storage, file import/load behavior, export behavior, Garmin adapter behavior, default plans, and app rendering.
-37. Android builds must run through the Ona task named **Build Android release APK**.
-38. The task must create `artifacts/stride-ai-release.apk` from the Android release variant.
-39. The current release variant is signed with the Android debug certificate and is for testing only; production/Google Play distribution requires a separately managed release keystore.
+Choose a non-Ona build environment during implementation. Garmin feasibility must establish which fields are actually retrievable. Define explicit constraints format and partial-week semantics before plan validation ships. Browser access and workout push do not gate the Android MVP. Confirm the ten-thread interpretation if ten individual exchanges was intended.
