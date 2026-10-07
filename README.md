@@ -6,7 +6,7 @@ A local-first personal trainer for running and cycling, built with Expo, React N
 
 The app now includes Plan, Chat, and Settings; goal/guidance imports; rolling seven-day views; plan validation and review; OpenRouter coaching; ten conversation threads; SQLite persistence on Android; exports; and versioned plan backup/restore. A browser preview uses local browser storage and memory-only API keys.
 
-Strict type checking and 61 automated tests passed after the reboot on 7 October 2026. Web and Android JavaScript exports have compiled. Native APK packaging is being verified separately; see [verification status](TESTING.md).
+Strict type checking, 62 automated tests, and web export passed in GitHub CI after the reboot on 7 October 2026. The native Android APK built successfully and its signature verified; phone and real-service testing remain open. See [verification status](TESTING.md).
 
 Garmin sign-in and sync are implemented behind an isolated native adapter but have **not been verified with a real account/device**. The current adapter fetches up to 100 recent running/cycling summaries, including optional HR, speed, elevation, power, and cadence. Lap detail, zones, fitness/load, and recovery endpoints are not implemented yet. Missing metrics remain unknown. Garmin workout push is deferred. Native iOS and Ona are out of scope.
 

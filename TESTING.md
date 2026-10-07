@@ -9,11 +9,13 @@ Updated 7 October 2026 after recovery from a reboot. Passing automated cases are
 - Expo compatibility check: passed before reboot.
 - Web export: rebuilt after reboot with the corrected hoisted dependency layout; preview restarted on localhost:8082. Reload retains the event and calculated 5:41/km pace.
 - Android JavaScript/Hermes export: compiled before reboot.
-- Android prebuild: passed. Native APK build is still in progress; install/upgrade checks are pending.
+- Android prebuild and native APK packaging: passed. `apksigner verify --print-certs` passed; package `com.cc454.strideai`, version 0.1.0, target API 36, all four ARM/x86 architectures. The APK contains the compiled JavaScript bundle and all three training Markdown assets. Install/upgrade checks remain pending.
 - Browser UI: goal loading, calculated 5:41/km pace, navigation, no-key generation error, and reload persistence were verified before reboot.
 - No real OpenRouter coaching request or Garmin account test has been executed. No Android device was connected at the last check.
 
 ## Acceptance-case traceability
+
+APK: `artifacts/stride-ai-release.apk`, 107,040,191 bytes. SHA-256: `366aa59ad302640f19db13b3d8fba5fde4585f62242c5901a9eaac4950dbf8b1`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`.
 
 Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md. “Pending” and “partial” are intentional: the Android release is not yet fully accepted.
 
@@ -62,8 +64,8 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-41 | Native SecureStore calls tested and disclosure implemented; native state/log/network inspection pending. |
 | AT-42 | Strict type checking passed. |
 | AT-43 | Suite passed; several manual acceptance checks remain. CI configuration added but not yet run on GitHub. |
-| AT-44 | Build tools installed and scripts implemented; successful native APK packaging pending. |
-| AT-45 | Debug-signing configuration generated; APK signature/install/upgrade checks pending. |
+| AT-44 | Workspace-local SDK/JDK installed; native release packaging completed successfully with the Windows path fixes. |
+| AT-45 | Testing-only debug-signed APK produced and signature verified; phone installation and data-preserving upgrade checks pending. |
 | AT-46 | Browser preview compiles and basic flows verified; broader responsive/backup checks pending. Optional. |
 | AT-47 | Deferred Garmin workout push. Optional. |
 | AT-48 | Deferred Garmin push retry tracking. Optional. |

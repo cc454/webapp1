@@ -32,7 +32,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Expo prebuild failed.' }
 }
 New-Item -ItemType Directory -Path (Join-Path $projectRoot 'artifacts') -Force | Out-Null
 Push-Location -LiteralPath (Join-Path $projectRoot 'android')
-try { & .\gradlew.bat assembleRelease --no-daemon '-Dorg.gradle.workers.max=2' --init-script (Join-Path $PSScriptRoot 'native-cache.gradle') | Tee-Object -FilePath (Join-Path $projectRoot 'artifacts/android-build.log') }
+try { & .\gradlew.bat :app:assembleRelease --no-daemon '-Dorg.gradle.workers.max=2' --init-script (Join-Path $PSScriptRoot 'native-cache.gradle') | Tee-Object -FilePath (Join-Path $projectRoot 'artifacts/android-build.log') }
 finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw 'Gradle Android build failed. See artifacts/android-build.log and .tools/gradle/daemon logs.' }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'android/app/build/outputs/apk/release/app-release.apk') -Destination (Join-Path $projectRoot 'artifacts/stride-ai-release.apk')
