@@ -12,7 +12,7 @@ export const defaultParameters=(id:string,sport:'run'|'ride'='run'):WorkoutParam
 describe('Editable workout primitives',()=>{
   it('ships exactly the ten requested categories and matches the editable Markdown file',()=>{
     expect(library.templates.map(t=>t.id)).toEqual(['ENDURANCE','LONG_ENDURANCE','TEMPO','THRESHOLD','VO2_LONG','VO2_SHORT','SPRINT','ANAEROBIC','PROGRESSIVE','RECOVERY']);
-    expect(readFileSync('training/workouts.md','utf8')).toBe(defaultWorkoutLibrary);
+    expect(readFileSync('training/workouts.md','utf8').replace(/\r\n/g,'\n')).toBe(defaultWorkoutLibrary);
     for(const t of library.templates)for(const sport of ['run','ride'] as const)expect(()=>validateParameters(t,sport,defaultParameters(t.id,sport))).not.toThrow();
   });
   it('migrates legacy settings without replacing plan, chats or credentials',()=>{
