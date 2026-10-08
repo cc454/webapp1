@@ -16,6 +16,7 @@ export function datesBetween(start: string, end: string) {
   return dates;
 }
 export const dayOfWeek = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
+export const displayDate = (date: string) => `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek(date)]} ${date}`;
 export const pace = (seconds: number, distanceKm: number) => {
   const s = Math.round(seconds / distanceKm);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} / km`;

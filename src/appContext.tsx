@@ -17,6 +17,7 @@ import { disconnect, isConnected, pullActivitySummaries, pullFitness, signIn } f
 import { shareBackup, shareExport, shareWorkoutLibrary } from './exports';
 import { decodeBackup } from './backup';
 import { constraintIssues } from './constraints';
+import { today } from './dates';
 
 type Review = { kind: 'proposal' | 'restore'; plan: Plan };
 function useController() {
@@ -147,6 +148,8 @@ function useController() {
     }),
     toggle: (id: string) => run('Saving completion…', async () => {
       const value = current.current; if (!value.plan || review) return;
+      const workout = value.plan.workouts.find(w => w.id === id);
+      if (!workout || workout.date !== today() || workout.sport === 'rest') throw new Error('Only today’s training can be marked complete or incomplete.');
       await commit({ ...value, plan: { ...value.plan, workouts: value.plan.workouts.map(w => w.id === id ? { ...w, completed: !w.completed } : w) } });
     }),
     chat: (question: string) => run('Asking coach…', async () => {

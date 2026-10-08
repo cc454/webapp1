@@ -1,20 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, AppState as NativeAppState, KeyboardAvoidingView, Modal, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { useApp } from './appContext';
 import { Button, Card, colors, Field, s } from './ui';
-import { addDays, duration, pace, today } from './dates';
+import { addDays, displayDate, duration, pace, today } from './dates';
 import { planDiff, upcoming } from './plan';
 import { isTruncated } from './llm';
 import { rulesSchema } from './types';
 import { constraintIssues } from './constraints';
 import { ChatMarkdown } from './ChatMarkdown';
 import { FitnessSettings } from './FitnessSettings';
+import { ModelSelector } from './ModelSelector';
 
-export function Page({ title, subtitle, children, footer }: { title: string; subtitle: string; children: React.ReactNode; footer?: React.ReactNode }) {
+export function Page({ title, subtitle, children, footer, scrollRef, onViewport, onContentChange }: { title: string; subtitle: string; children: React.ReactNode; footer?: React.ReactNode; scrollRef?: React.RefObject<ScrollView | null>; onViewport?: (height: number) => void; onContentChange?: () => void }) {
   const app = useApp();
   const scroll = useRef<ScrollView>(null);
-  useEffect(() => { if (app.busy || app.error || app.notice) scroll.current?.scrollTo({ y: 0, animated: true }); }, [app.busy, app.error, app.notice]);
-  return <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView ref={scroll} style={s.page} keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
+  useEffect(() => { if (app.error || (!scrollRef && (app.busy || app.notice))) (scrollRef ?? scroll).current?.scrollTo({ y: 0, animated: true }); }, [app.busy, app.error, app.notice, scrollRef]);
+  return <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView ref={scrollRef ?? scroll} testID="page-scroll" onLayout={event => onViewport?.(event.nativeEvent.layout.height)} onContentSizeChange={onContentChange} style={s.page} keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
     <Text style={s.eyebrow}>STRIDE / PERSONAL TRAINING</Text><Text style={s.title}>{title}</Text><Text style={s.muted}>{subtitle}</Text>
     {!app.ready && <ActivityIndicator color={colors.accent} />}
     {!!app.busy && <Card><View style={s.row}><ActivityIndicator color={colors.accent} /><Text style={s.body}>{app.busy}</Text></View>{/^(Generating|Repairing)/.test(app.busy) && <Button title="Cancel generation" secondary onPress={app.cancelGeneration} />}</Card>}
@@ -50,41 +51,64 @@ export function PlanScreen() {
   const [discardDraft, setDiscardDraft] = useState(false);
   const [discardFailed, setDiscardFailed] = useState(false);
   const [date, setDate] = useState(today);
-  useEffect(() => { const interval = setInterval(() => setDate(today()), 60000); return () => clearInterval(interval); }, []);
+  useEffect(() => {
+    const interval = setInterval(() => setDate(today()), 60000);
+    const subscription = NativeAppState.addEventListener('change', status => { if (status === 'active') setDate(today()); });
+    return () => { clearInterval(interval); subscription.remove(); };
+  }, []);
   const event = state.plan?.event ?? state.event;
   const sessions = state.plan ? upcoming(state.plan.workouts, date) : [];
   return <Page title="Your next seven days" subtitle="A clear plan. Room to adapt.">
-    {event ? <Card><Text style={s.eyebrow}>TARGET EVENT</Text><Text style={s.heading}>{event.name}</Text><Text style={s.body}>{event.date} · {event.distanceKm} km · {event.elevationM} m gain</Text><Text style={s.muted}>Target {duration(event.targetSeconds)} · {pace(event.targetSeconds, event.distanceKm)}</Text></Card> : <Card><Text style={s.heading}>Start with your event</Text><Text style={s.body}>Load goal.md in Settings, connect Garmin, then generate your first plan for review.</Text></Card>}
+    {event ? <Card><Text style={s.eyebrow}>TARGET EVENT</Text><Text style={s.heading}>{event.name}</Text><Text style={s.body}>{displayDate(event.date)} · {event.distanceKm} km · {event.elevationM} m gain</Text><Text style={s.muted}>Target {duration(event.targetSeconds)} · {pace(event.targetSeconds, event.distanceKm)}</Text></Card> : <Card><Text style={s.heading}>Start with your event</Text><Text style={s.body}>Load goal.md in Settings, connect Garmin, then generate your first plan for review.</Text></Card>}
     <Review />
     {(app.draft || app.draftError) && !app.review && <Card><Text style={s.heading}>Saved generation draft</Text><Text style={s.body}>{app.draft?.overview.length ?? 0} validated weeks retained. {app.draft?.pipeline==='library' ? `${app.draft.outline ? 'Overall progression saved. ' : ''}${app.draft.blocks ? 'Workout blocks saved. ' : ''}Resume continues from the saved planning stage.` : 'Resume retries the unfinished week without regenerating earlier weeks.'} The active plan is unchanged.</Text>{app.draftMismatch&&<Text style={s.error}>Saved generation inputs have changed. Discard this draft to start a fresh proposal.</Text>}<Button title="Resume generation" onPress={() => app.generate(app.draft!.request)} disabled={!app.available || app.draftError || app.draftMismatch} /><Button title="Discard saved draft" secondary onPress={() => { setDiscardFailed(false); setDiscardDraft(true); }} disabled={!app.available} /><Text style={s.muted}>Discard opens a confirmation. Confirm it to remove the saved draft and enable fresh generation.</Text></Card>}
     <Modal visible={discardDraft} transparent animationType="fade" onRequestClose={()=>{if(!app.busy)setDiscardDraft(false);}}><View accessibilityViewIsModal style={{flex:1,backgroundColor:'#000000BB',justifyContent:'center',padding:22}}><View style={{width:'100%',maxWidth:500,alignSelf:'center'}}><Card><Text style={s.heading}>Discard saved draft?</Text><Text style={s.body}>This removes the saved progression, workout blocks and generated weeks. A fresh run may charge for them again. Your active plan and settings are retained.</Text>{discardFailed&&<Text accessibilityRole="alert" style={s.error}>{app.error || 'The draft could not be discarded. Try again.'}</Text>}{!!app.busy&&<Text style={s.muted}>{app.busy}</Text>}<Button title="Confirm discard draft" onPress={async()=>{if(await app.discardDraft())setDiscardDraft(false);else setDiscardFailed(true);}} disabled={!app.available}/><Button title="Keep saved draft" secondary onPress={()=>setDiscardDraft(false)} disabled={!!app.busy}/></Card></View></View></Modal>
     {!state.plan && <Card><Text style={s.heading}>Build your starting plan</Text><Text style={s.body}>The coach uses your goal, available Garmin history, and training guidance. Android generation continues with the screen off or while using another app; progress appears in a notification. Validated weeks are saved as a draft. You review the complete proposal before saving it.</Text>{!state.lastSync && <Text style={s.muted}>No Garmin data synced yet. A proposal may be less personalized.</Text>}<Button title="Generate initial plan" onPress={() => app.generate()} disabled={!app.available || !state.event || !!app.review || !!app.draft || app.draftError} />{!state.event ? <Text style={s.muted}>Load a goal in Settings to enable generation.</Text> : (app.draft||app.draftError) ? <Text style={s.muted}>Confirm discard of the saved draft before starting a fresh plan.</Text> : app.review ? <Text style={s.muted}>Accept or reject the current proposal before generating another.</Text> : null}</Card>}
     {state.plan && <>
       <View style={s.row}><Text style={s.eyebrow}>{date} → {addDays(date, 6)}</Text><Text style={s.muted}>Revision {state.plan.revision}</Text></View>
-      {Array.from({ length: 7 }, (_, i) => addDays(date, i)).map(day => <View key={day} style={{ gap: 10 }}><Text style={s.label}>{day}{day === event?.date ? ' · EVENT DAY' : ''}</Text>
-        {sessions.filter(w => w.date === day).map(w => <Card key={w.id}><View style={{ ...s.row, justifyContent: 'space-between' }}><Text style={s.eyebrow}>{w.sport === 'ride' ? 'CYCLING' : w.sport.toUpperCase()}</Text><Text style={s.muted}>{w.completed ? 'COMPLETE' : w.intensity.toUpperCase()}</Text></View><Text style={s.heading}>{w.title}</Text><Text style={s.body}>{w.detail}</Text><Text style={s.muted}>{duration(w.durationSeconds)} · {w.distanceKm} km{w.long ? ' · Long session' : ''}</Text>{w.steps.map((step, i) => <Text key={i} style={s.muted}>{step.repeats} × {duration(step.seconds)} {step.kind} · {step.target}</Text>)}<Button title={w.completed ? 'Mark incomplete' : 'Mark complete'} secondary onPress={() => app.toggle(w.id)} disabled={!app.available || !!app.review} /></Card>)}
+      {Array.from({ length: 7 }, (_, i) => addDays(date, i)).map(day => <View key={day} style={{ gap: 10 }}><Text style={s.label}>{displayDate(day)}{day === event?.date ? ' · EVENT DAY' : ''}</Text>
+        {sessions.filter(w => w.date === day).map(w => <Card key={w.id}><View style={{ ...s.row, justifyContent: 'space-between' }}><Text style={s.eyebrow}>{w.sport === 'ride' ? 'CYCLING' : w.sport.toUpperCase()}</Text><Text style={s.muted}>{w.completed ? 'COMPLETE' : w.intensity.toUpperCase()}</Text></View><Text style={s.heading}>{w.title}</Text><Text style={s.body}>{w.detail}</Text><Text style={s.muted}>{duration(w.durationSeconds)} · {w.distanceKm} km{w.long ? ' · Long session' : ''}</Text>{w.steps.map((step, i) => <Text key={i} style={s.muted}>{step.repeats} × {duration(step.seconds)} {step.kind} · {step.target}</Text>)}{day === date && w.sport !== 'rest' && <Button title={w.completed ? 'Mark incomplete' : 'Mark complete'} secondary onPress={() => app.toggle(w.id)} disabled={!app.available || !!app.review} />}</Card>)}
         {!sessions.some(w => w.date === day) && <Text style={s.muted}>{day > state.plan!.end ? 'After event · No training scheduled' : 'No session scheduled'}</Text>}
       </View>)}
-      <Button title={overview ? 'Hide full plan overview' : 'View full plan overview'} secondary onPress={() => setOverview(!overview)} />
-      {overview && state.plan.overview.map((week, i) => <Card key={week.start}><Text style={s.eyebrow}>WEEK {i + 1} · {week.start} → {week.end}</Text><Text style={s.heading}>{week.phase}</Text><Text style={s.body}>{week.focus}</Text><Text style={s.muted}>{week.runningKm} km running · {week.cyclingKm} km cycling</Text></Card>)}
       <Card><Text style={s.heading}>Take your plan with you</Text><View style={s.row}>{(['md', 'pdf', 'ics'] as const).map(kind => <Button key={kind} title={{ md: 'Markdown', pdf: 'PDF', ics: 'Calendar' }[kind]} secondary onPress={() => app.exportWeek(kind)} disabled={!app.available} />)}</View><Button title="Back up current plan" onPress={app.backup} disabled={!app.available} /></Card>
     </>}
     <Button title="Restore a plan backup" secondary onPress={app.restore} disabled={!!app.busy || !!app.review || !app.ready} />
+    {state.plan && <Card><Text style={s.heading}>Entire plan summary</Text><Text style={s.muted}>{displayDate(state.plan.start)} → {displayDate(state.plan.end)} · {state.plan.overview.length} weeks</Text>
+      <Button title={overview ? 'Collapse plan summary' : 'Expand plan summary'} secondary onPress={() => setOverview(!overview)} />
+      {overview && <View testID="plan-summary" style={{ gap: 16 }}>
+        {!!state.plan.strategy && <Text style={s.body}>{state.plan.strategy}</Text>}
+        <Text style={s.body}>{state.plan.workouts.filter(w => w.sport === 'run').reduce((sum, w) => sum + w.distanceKm, 0).toFixed(1)} km running · {state.plan.workouts.filter(w => w.sport === 'ride').reduce((sum, w) => sum + w.distanceKm, 0).toFixed(1)} km cycling</Text>
+        {state.plan.progressions?.map(p => <Text key={p.id} style={s.muted}>{p.sport === 'ride' ? 'Cycling' : 'Running'} · {p.templateId}: {p.approach}</Text>)}
+        {state.plan.constraintDecisions?.map((decision, i) => <Text key={i} style={s.muted}>Constraint decision: {decision}</Text>)}
+        {state.plan.overview.map((week, i) => <View key={week.start} style={{ gap: 4 }}><Text style={s.eyebrow}>WEEK {i + 1} · {displayDate(week.start)} → {displayDate(week.end)}</Text><Text style={s.heading}>{week.phase}</Text><Text style={s.body}>{week.focus}</Text><Text style={s.muted}>{week.runningKm} km running · {week.cyclingKm} km cycling</Text></View>)}
+      </View>}
+    </Card>}
   </Page>;
 }
 export function ChatScreen() {
   const app = useApp(); const [question, setQuestion] = useState('');
   const thread = app.state.threads.find(t => t.id === app.threadId);
+  const scroll = useRef<ScrollView>(null);
+  const [viewport, setViewport] = useState(0);
+  const lastCoach = thread?.messages.map(m => m.role).lastIndexOf('assistant') ?? -1;
+  const targetKey = lastCoach >= 0 ? `${thread!.id}-${lastCoach}` : null;
+  const target = useRef<{ key: string; y: number } | null>(null);
+  function revealCoach() {
+    if (!app.error && target.current?.key === targetKey) scroll.current?.scrollTo({ y: target.current!.y, animated: true });
+  }
   async function send() {
     const sent = question;
     if (await app.chat(sent)) setQuestion(value => value === sent ? '' : value);
   }
   const composer = <Card><Field label="What would you like to discuss?" multiline style={{ height: 80 }} value={question} onChangeText={setQuestion} placeholder="How should I adjust after a missed session?" /><View style={s.row}><Button title="Send message" onPress={send} disabled={!app.available || !question.trim()} /><Button title="Propose plan changes" secondary onPress={() => app.generate(question)} disabled={!app.available || !app.state.plan || !question.trim() || !!app.review} /></View><Text style={s.muted}>A plan-change proposal appears for review on Plan. Only accepted changes are saved.</Text></Card>;
-  return <Page title="Talk to your coach" subtitle="Reflect on training. Review the next step." footer={composer}>
+  return <Page title="Talk to your coach" subtitle="Reflect on training. Review the next step." footer={composer} scrollRef={scroll} onViewport={height => { setViewport(height); revealCoach(); }} onContentChange={revealCoach}>
     <Card><Text style={s.muted}>Coaching sends event, plan, guidance, relevant messages, and Garmin summaries through OpenRouter to your selected model provider. Credentials are excluded. Advice does not change your saved plan.</Text><Text style={s.label}>{app.state.settings.model}</Text></Card>
     <View style={s.row}><Button title="New conversation" secondary onPress={() => app.setThreadId(null)} disabled={!app.available} /></View>
     {app.state.threads.length > 0 && <Card><Text style={s.eyebrow}>RECENT CONVERSATIONS / {app.state.threads.length} OF 10</Text>{app.state.threads.map(t => <Button key={t.id} title={t.title} secondary onPress={() => app.setThreadId(t.id)} disabled={!app.available} />)}</Card>}
-    {thread?.messages.map((m, i) => <Card key={i}><Text style={s.eyebrow}>{m.role === 'user' ? 'YOU' : 'COACH'}</Text><ChatMarkdown content={m.content} /></Card>)}
+    {thread?.messages.map((m, i) => <View key={`${thread.id}-${i}`} testID={`chat-message-${i}`} onLayout={event => {
+      if (i === lastCoach) { target.current = { key: `${thread.id}-${i}`, y: event.nativeEvent.layout.y }; revealCoach(); }
+    }}><Card><Text style={s.eyebrow}>{m.role === 'user' ? 'YOU' : 'COACH'}</Text><ChatMarkdown content={m.content} /></Card></View>)}
+    {targetKey && <View testID="chat-scroll-space" style={{ height: viewport }} />}
   </Page>;
 }
 export function SettingsScreen() {
@@ -103,7 +127,7 @@ export function SettingsScreen() {
   }
   return <Page title="Your training setup" subtitle="Local data. Your accounts. Your choices.">
     {!!localError && <Text style={s.error}>{localError}</Text>}
-    <Card><Text style={s.heading}>OpenRouter</Text><Field label="Model identifier" value={draft.model} onChangeText={model => setDraft({ ...draft, model })} autoCapitalize="none" /><Field label="OpenRouter API key (blank retains saved key)" value={key} onChangeText={setKey} secureTextEntry autoCapitalize="none" autoCorrect={false} /><Text style={s.muted}>Plan generation validates JSON responses; models without structured output use a JSON prompt fallback. {Platform.OS === 'web' ? 'Browser key is memory-only.' : 'The key is encrypted on this device.'}</Text><Button title="Remove saved API key" secondary onPress={app.removeKey} disabled={!app.available} /></Card>
+    <Card><Text style={s.heading}>OpenRouter</Text><ModelSelector value={draft.model} onChange={model => setDraft({ ...draft, model })} /><Field label="Model identifier" value={draft.model} onChangeText={model => setDraft({ ...draft, model })} autoCapitalize="none" /><Field label="OpenRouter API key (blank retains saved key)" value={key} onChangeText={setKey} secureTextEntry autoCapitalize="none" autoCorrect={false} /><Text style={s.muted}>Plan generation validates JSON responses; models without structured output use a JSON prompt fallback. {Platform.OS === 'web' ? 'Browser key is memory-only.' : 'The key is encrypted on this device.'}</Text><Button title="Remove saved API key" secondary onPress={app.removeKey} disabled={!app.available} /></Card>
     <Card><Text style={s.heading}>Event goal</Text><Text style={s.muted}>Import goal.md with name, date, distance (km), target time (H:MM), and elevation (m). Pace is calculated.</Text><View style={s.row}><Button title="Import goal.md" secondary onPress={() => app.loadContent('goal', false)} disabled={!app.available || !!app.review} /><Button title="Load project goal" secondary onPress={() => app.loadContent('goal', true)} disabled={!app.available || !!app.review} /></View></Card>
     <Card><Text style={s.heading}>Garmin Connect</Text><Text style={s.muted}>{app.connected ? 'Connected' : 'Disconnected'} · Last sync: {app.state.lastSync ? new Date(app.state.lastSync).toLocaleString('en-GB') : 'Never'}</Text><Field label="Garmin email" value={draft.garminEmail} onChangeText={garminEmail => setDraft({ ...draft, garminEmail })} autoCapitalize="none" keyboardType="email-address" /><Field label="Garmin password (blank retains saved password)" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} /><Text style={s.muted}>Save settings before connecting. Sync fetches the last 50 activities and refreshes your Garmin fitness metrics.</Text><View style={s.row}><Button title="Connect Garmin" secondary onPress={app.connect} disabled={!app.available || Platform.OS === 'web'} /><Button title="Sync activities" onPress={app.sync} disabled={!app.available || Platform.OS === 'web'} /><Button title="Disconnect" secondary onPress={app.disconnect} disabled={!app.available || Platform.OS === 'web'} /></View><Text style={s.muted}>{app.state.activities.length} cached running/cycling activities</Text></Card>
     <FitnessSettings fitness={app.state.fitness} />

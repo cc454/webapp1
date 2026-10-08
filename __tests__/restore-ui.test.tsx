@@ -13,6 +13,7 @@ import { emptyState } from '../src/defaults';
 import { fixturePlan } from './fixtures';
 import { encodeBackup } from '../src/backup';
 describe('AT-11,37: completion and reviewed restore', () => {
+  afterEach(() => jest.useRealTimers());
   it('restores only on acceptance and retains chats/settings', async () => {
     const state = emptyState(); state.settings.model = 'my/model'; state.threads = [{ id: 'retained', title: 'My chat', updatedAt: 'now', messages: [] }];
     (loadState as jest.Mock).mockResolvedValue(state); (saveState as jest.Mock).mockResolvedValue(undefined);
@@ -30,9 +31,29 @@ describe('AT-11,37: completion and reviewed restore', () => {
     jest.useFakeTimers().setSystemTime(new Date('2027-04-05T12:00:00Z'));
     const state = emptyState(); state.plan = fixturePlan(); state.event = state.plan.event;
     (loadState as jest.Mock).mockResolvedValue(state); (saveState as jest.Mock).mockResolvedValue(undefined); render(<App />);
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Mark complete' })[0]).toBeEnabled());
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Mark complete' })).toHaveLength(1));
     fireEvent.press(screen.getAllByRole('button', { name: 'Mark complete' })[0]!);
     await waitFor(() => expect(saveState).toHaveBeenCalledTimes(1)); expect((saveState as jest.Mock).mock.calls[0][0].plan.workouts[0].completed).toBe(true);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark incomplete' })).toBeEnabled());
+    fireEvent.press(screen.getByRole('button', { name: 'Mark incomplete' }));
+    await waitFor(() => expect(saveState).toHaveBeenCalledTimes(2)); expect((saveState as jest.Mock).mock.calls[1][0].plan.workouts[0].completed).toBe(false);
     jest.useRealTimers();
+  });
+  it('rejects a completion press after midnight even before the screen refreshes', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2027-04-05T12:00:00Z'));
+    const state = emptyState(); state.plan = fixturePlan();
+    (loadState as jest.Mock).mockResolvedValue(state); (saveState as jest.Mock).mockClear(); render(<App />);
+    const button = await screen.findByRole('button', { name: 'Mark complete' });
+    jest.setSystemTime(new Date('2027-04-06T12:00:00Z')); fireEvent.press(button);
+    await screen.findByText('Only today’s training can be marked complete or incomplete.');
+    expect(saveState).not.toHaveBeenCalled();
+  });
+  it('does not offer completion for today’s rest or future training', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2027-04-06T12:00:00Z'));
+    const state = emptyState(); state.plan = fixturePlan();
+    (loadState as jest.Mock).mockResolvedValue(state); render(<App />);
+    await screen.findByText('Tuesday 2027-04-06');
+    expect(screen.queryByRole('button', { name: 'Mark complete' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Mark incomplete' })).toBeNull();
   });
 });

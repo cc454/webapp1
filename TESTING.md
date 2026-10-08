@@ -1,6 +1,14 @@
 # Verification record
 
-Updated 7 October 2026 after recovery from a reboot. Passing automated cases are evidence for the named logic, not proof of native device behavior or real-service compatibility.
+Updated 8 October 2026. Passing automated cases are evidence for the named logic, not proof of native device behavior or real-service compatibility.
+
+## Plan, chat and model usability in 0.1.6
+
+The owner reports all recent changes work. The new update limits completion/uncompletion to today's running/cycling sessions, checks the device's local date again when saving, refreshes the calendar on foreground return, and displays English weekday labels. A collapsible entire-plan summary appears after the export/restore controls and includes saved strategy, progression, constraint decisions, sport totals and all phase weeks. Older plans still show their calendar, totals and phases.
+
+Chat scrolls to the layout position of the latest coach message when it arrives or a conversation opens; earlier message layouts cannot replace the target. A viewport-sized space below the conversation permits even a short reply to align at its top. Keyboard resizing updates that space. Manual scrolling does not trigger automatic jumps. Error feedback still scrolls into view. The model dropdown provides Sonnet 4.6, Haiku 4.5 and Gemini 2.5 Flash, retaining the editable identifier and explicit Save settings behavior.
+
+Regression cases cover today's completion/uncompletion persistence, future/rest exclusion and a stale button pressed after midnight; exact Thursday date formatting; expanded/collapsed modern and legacy summaries; latest-reply layout, thread switching, new replies and keyboard viewport changes; all three preset IDs, custom editing, persistence and reload. Android visual acceptance of these new controls remains to be checked on the phone. No live provider requests were needed for these changes.
 
 ## Draft discard/restart and 0.1.5 update
 
@@ -75,7 +83,7 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-08 | plan.test.ts covers date boundaries and long intervals; full long-plan AI generation pending. |
 | AT-09 | plan.test.ts covers the rolling interval; rendered plan fixtures cover the view. |
 | AT-10 | Plan screen fields implemented; representative device review pending. |
-| AT-11 | restore-ui.test.tsx verifies completion persistence from rendered controls. |
+| AT-11 | restore-ui.test.tsx verifies today's completion/uncompletion persistence, future/rest exclusion and a stale press across midnight without saving. Native date rollover/restart checks remain. |
 | AT-12 | Overview validation implemented; long/partial plan rendering review pending. |
 | AT-13 | constraints.test.ts and plan.test.ts verify supported rules, conflict detection, partial-block policy, and date-specific construction limits. llm.test.ts reproduces the reported Monday long-session/40-minute failure and verifies explicit initial/repair instructions and schema-pinned dates/rules. |
 | AT-14 | app.test.tsx verifies no save before acceptance and duplicate generation prevention. |
@@ -128,6 +136,11 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-61 | library-planner.test.ts builds a 27-week/two-request fixture, unique independent repeat instances, complete/partial dates, strict bounds and preserved history. workout-library.test.ts verifies chronological between-repetition/set recovery and FTP mapping. |
 | AT-62 | Tests cover saved outline resume, next-day creation dates, complete-draft zero-request reuse, metadata backup round-trip and rendered strategy/constraint/phase review before acceptance. Native background/restart checks pending. |
 | AT-63 | generation-inputs.test.ts verifies nested/legacy JSON ordering and state round-trip compatibility; both generation engines test complete-draft reuse with reordered signatures. app.test.tsx verifies modal cancellation/confirmation, deletion failure/retry, fresh generation without the discarded draft and stale background-read rejection. Phone recheck pending. |
+
+| AT-64 | navigation-ui.test.tsx checks Thursday 2026-10-08; restore-ui.test.tsx verifies rendered local calendar weekday. Native timezone/date rollover check pending. |
+| AT-65 | navigation-ui.test.tsx expands/collapses saved strategy, full phase focus and totals, and verifies legacy plans without metadata. Native multiweek visual check pending. |
+| AT-66 | navigation-ui.test.tsx verifies latest coach coordinates, short-reply spacer, keyboard viewport resizing, thread switching and a new reply. Native keyboard/manual scrolling check pending. |
+| AT-67 | navigation-ui.test.tsx checks exact preset IDs and custom editing without automatic save. chat-ui.test.tsx verifies preset/custom persistence and reload. Existing provider tests verify selected-model payloads. Native dropdown/live preset requests pending. |
 
 ## Device acceptance sequence
 
