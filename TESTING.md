@@ -2,6 +2,12 @@
 
 Updated 8 October 2026. Passing automated cases are evidence for the named logic, not proof of native device behavior or real-service compatibility.
 
+## Compact shared layout in 0.1.9
+
+All four page subtitles are removed, including the subtitle property on shared Page. Branding is a single horizontal row with a 26px-high mark, 22px wordmark and one-line descriptor. The descriptor uses 10px text (8px below 360px) and native font fitting; branding scaling is capped at 1.2×. Page headings use 26px text/32px line height, with a 12px gap below the brand row. Working-content padding, body text, controls and useful disclosures are retained.
+
+Strict TypeScript, 135 tests across 21 suites and web export pass locally. The first cold test run timed out in the existing chat-success case during concurrent compilation; the complete warm rerun passed with no test changes. Browser inspection initially found descriptor clipping at 320px; reducing the wordmark and mark resolved it. Final measured text widths fit their available widths at 320px and 360px. All four tab subtitles are absent, and their page headings remain accessible. Native large-text/keyboard appearance remains a phone acceptance check.
+
 ## Launcher branding in 0.1.8
 
 The owner confirms the recent app changes work, but reported the Android robot launcher icon under the correct Adaptai name. The app had no Expo launcher icon configuration. Version 0.1.8 now uses PNGs rendered from the existing vector brand mark for legacy, adaptive and monochrome launcher layers. The adaptive artwork fits within its central safe circle; the background matches the app's near-black palette. No new design or provider requests are needed.
@@ -157,6 +163,8 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-67 | navigation-ui.test.tsx checks exact preset IDs and custom editing without automatic save. chat-ui.test.tsx verifies preset/custom persistence and reload. Existing provider tests verify selected-model payloads. Native dropdown/live preset requests pending. |
 
 | AT-68 | Source and generated assets inspected; safe bounds verified. All 20 packaged launcher images match generated assets, both compiled adaptive XMLs reference custom layers/dark background, and APK label/version/signature are verified. Home/all-apps and themed-icon checks await phone upgrade. |
+
+| AT-69 | Source subtitle property/callers removed; all four browser tabs show only page headings. Measured descriptor fits on one line at 320px and 360px. Design guide documents hierarchy, spacing, font fitting and accessibility boundaries. Existing chat/plan/settings/library tests pass; Android visual/large-text checks pending installation. |
 
 ## Device acceptance sequence
 

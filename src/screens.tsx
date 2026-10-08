@@ -12,12 +12,12 @@ import { FitnessSettings } from './FitnessSettings';
 import { ModelSelector } from './ModelSelector';
 import { BrandHeader } from './BrandHeader';
 
-export function Page({ title, subtitle, children, footer, scrollRef, onViewport, onContentChange }: { title: string; subtitle: string; children: React.ReactNode; footer?: React.ReactNode; scrollRef?: React.RefObject<ScrollView | null>; onViewport?: (height: number) => void; onContentChange?: () => void }) {
+export function Page({ title, children, footer, scrollRef, onViewport, onContentChange }: { title: string; children: React.ReactNode; footer?: React.ReactNode; scrollRef?: React.RefObject<ScrollView | null>; onViewport?: (height: number) => void; onContentChange?: () => void }) {
   const app = useApp();
   const scroll = useRef<ScrollView>(null);
   useEffect(() => { if (app.error || (!scrollRef && (app.busy || app.notice))) (scrollRef ?? scroll).current?.scrollTo({ y: 0, animated: true }); }, [app.busy, app.error, app.notice, scrollRef]);
   return <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView ref={scrollRef ?? scroll} testID="page-scroll" onLayout={event => onViewport?.(event.nativeEvent.layout.height)} onContentSizeChange={onContentChange} style={s.page} keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
-    <BrandHeader /><Text accessibilityRole="header" style={s.title}>{title}</Text><Text style={s.muted}>{subtitle}</Text>
+    <View style={{ gap: 12 }}><BrandHeader /><Text accessibilityRole="header" style={s.title}>{title}</Text></View>
     {!app.ready && <ActivityIndicator color={colors.accent} />}
     {!!app.busy && <Card><View style={s.row}><ActivityIndicator color={colors.accent} /><Text style={s.body}>{app.busy}</Text></View>{/^(Generating|Repairing)/.test(app.busy) && <Button title="Cancel generation" secondary onPress={app.cancelGeneration} />}</Card>}
     {!!app.error && <Card><Text accessibilityRole="alert" style={s.error}>{app.error}</Text></Card>}
@@ -59,7 +59,7 @@ export function PlanScreen() {
   }, []);
   const event = state.plan?.event ?? state.event;
   const sessions = state.plan ? upcoming(state.plan.workouts, date) : [];
-  return <Page title="Your next seven days" subtitle="A clear plan. Room to adapt.">
+  return <Page title="Your next seven days">
     {event ? <Card><Text style={s.eyebrow}>TARGET EVENT</Text><Text style={s.heading}>{event.name}</Text><Text style={s.body}>{displayDate(event.date)} · {event.distanceKm} km · {event.elevationM} m gain</Text><Text style={s.muted}>Target {duration(event.targetSeconds)} · {pace(event.targetSeconds, event.distanceKm)}</Text></Card> : <Card><Text style={s.heading}>Start with your event</Text><Text style={s.body}>Load goal.md in Settings, connect Garmin, then generate your first plan for review.</Text></Card>}
     <Review />
     {(app.draft || app.draftError) && !app.review && <Card><Text style={s.heading}>Saved generation draft</Text><Text style={s.body}>{app.draft?.overview.length ?? 0} validated weeks retained. {app.draft?.pipeline==='library' ? `${app.draft.outline ? 'Overall progression saved. ' : ''}${app.draft.blocks ? 'Workout blocks saved. ' : ''}Resume continues from the saved planning stage.` : 'Resume retries the unfinished week without regenerating earlier weeks.'} The active plan is unchanged.</Text>{app.draftMismatch&&<Text style={s.error}>Saved generation inputs have changed. Discard this draft to start a fresh proposal.</Text>}<Button title="Resume generation" onPress={() => app.generate(app.draft!.request)} disabled={!app.available || app.draftError || app.draftMismatch} /><Button title="Discard saved draft" secondary onPress={() => { setDiscardFailed(false); setDiscardDraft(true); }} disabled={!app.available} /><Text style={s.muted}>Discard opens a confirmation. Confirm it to remove the saved draft and enable fresh generation.</Text></Card>}
@@ -103,7 +103,7 @@ export function ChatScreen({ visit = 0 }: { visit?: number } = {}) {
     if (await app.chat(sent)) setQuestion(value => value === sent ? '' : value);
   }
   const composer = <Card><Field label="What would you like to discuss?" multiline style={{ height: 80 }} value={question} onChangeText={setQuestion} placeholder="How should I adjust after a missed session?" /><View style={s.row}><Button title="Send message" onPress={send} disabled={!app.available || !question.trim()} /><Button title="Propose plan changes" secondary onPress={() => app.generate(question)} disabled={!app.available || !app.state.plan || !question.trim() || !!app.review} /></View><Text style={s.muted}>A plan-change proposal appears for review on Plan. Only accepted changes are saved.</Text></Card>;
-  return <Page title="Talk to your coach" subtitle="Reflect on training. Review the next step." footer={composer} scrollRef={scroll} onViewport={height => { setViewport(height); revealCoach(); }} onContentChange={revealCoach}>
+  return <Page title="Talk to your coach" footer={composer} scrollRef={scroll} onViewport={height => { setViewport(height); revealCoach(); }} onContentChange={revealCoach}>
     <Card><Text style={s.muted}>Coaching sends event, plan, guidance, relevant messages, and Garmin summaries through OpenRouter to your selected model provider. Credentials are excluded. Advice does not change your saved plan.</Text><Text style={s.label}>{app.state.settings.model}</Text></Card>
     <View style={s.row}><Button title="New conversation" secondary onPress={() => app.setThreadId(null)} disabled={!app.available} /></View>
     {app.state.threads.length > 0 && <Card><Text style={s.eyebrow}>RECENT CONVERSATIONS / {app.state.threads.length} OF 10</Text>{app.state.threads.map(t => <Button key={t.id} title={t.title} secondary onPress={() => app.setThreadId(t.id)} disabled={!app.available} />)}</Card>}
@@ -127,7 +127,7 @@ export function SettingsScreen() {
     if (!result.success || !restDays.trim() || !monday.trim() || !draft.model.trim()) { setLocalError('Enter a model, 0–7 rest days, and a nonnegative Monday duration.'); return; }
     setLocalError(''); await app.configure({ ...draft, model: draft.model.trim(), rules: result.data }, key, password); setKey(''); setPassword('');
   }
-  return <Page title="Your training setup" subtitle="Local data. Your accounts. Your choices.">
+  return <Page title="Your training setup">
     {!!localError && <Text style={s.error}>{localError}</Text>}
     <Card><Text style={s.heading}>OpenRouter</Text><ModelSelector value={draft.model} onChange={model => setDraft({ ...draft, model })} /><Field label="Model identifier" value={draft.model} onChangeText={model => setDraft({ ...draft, model })} autoCapitalize="none" /><Field label="OpenRouter API key (blank retains saved key)" value={key} onChangeText={setKey} secureTextEntry autoCapitalize="none" autoCorrect={false} /><Text style={s.muted}>Plan generation validates JSON responses; models without structured output use a JSON prompt fallback. {Platform.OS === 'web' ? 'Browser key is memory-only.' : 'The key is encrypted on this device.'}</Text><Button title="Remove saved API key" secondary onPress={app.removeKey} disabled={!app.available} /></Card>
     <Card><Text style={s.heading}>Event goal</Text><Text style={s.muted}>Import goal.md with name, date, distance (km), target time (H:MM), and elevation (m). Pace is calculated.</Text><View style={s.row}><Button title="Import goal.md" secondary onPress={() => app.loadContent('goal', false)} disabled={!app.available || !!app.review} /><Button title="Load project goal" secondary onPress={() => app.loadContent('goal', true)} disabled={!app.available || !!app.review} /></View></Card>

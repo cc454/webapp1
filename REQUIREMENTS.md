@@ -108,6 +108,12 @@ Confirmed: ten chats means ten conversation threads with their messages. Working
 | --- | --- | --- |
 | R-68 | Use the existing Adaptai teal A as the Android home-screen/app-list icon, with a dark background, round/adaptive support and a monochrome layer for themed launchers. Keep the Adaptai label, package identity and upgrade signing. | AT-68: Prebuild and inspect all five launcher densities, adaptive foreground/background/monochrome references and safe artwork bounds. Inspect the built APK's icon resources and label, compare packaged images to generated assets, and verify version/signature for an in-place upgrade. Install over the existing phone app and check home/all-apps screens with normal and themed icons. |
 
+## Required compact shared layout
+
+| ID | Requirement | Test case |
+| --- | --- | --- |
+| R-69 | Remove per-tab subtitles from Plan, Chat, Settings and Workout Library. Place the logo, Adaptai wordmark and full PERSONAL ENDURANCE TRAINING descriptor on one horizontal line. Use smaller 26px page/tab headings with 32px line height and 12px separation below branding; preserve readable content, useful disclosures and touch targets. | AT-69: Inspect all four tabs at 320px, 360px and desktop widths; verify no subtitle/empty subtitle row, complete single-line branding, smaller headings and more content above the fold. Check Android large text, screen-reader names, keyboard/composer and scrolling; verify no overlaps or clipped essential content. |
+
 ## Known input issue and implementation decisions
 
 training/goal.md specifies Halbmarathon, 21.1 km, 2:00, 10 m elevation, on 11 April 2027, as updated by the owner. Legacy 5:30/km is superseded by computed 5:41/km.

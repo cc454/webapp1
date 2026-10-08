@@ -25,7 +25,7 @@ export const s = StyleSheet.create({
   composer: { width: '100%', maxWidth: 900, alignSelf: 'center', padding: 12, backgroundColor: colors.bg },
   card: { backgroundColor: colors.panel, borderColor: colors.edge, borderWidth: 1, borderRadius: 18, padding: 20, gap: 12 },
   eyebrow: { color: colors.accent, fontSize: 11, letterSpacing: 2.2, fontWeight: '700' },
-  title: { color: colors.text, fontSize: 32, fontWeight: '700', letterSpacing: -1 },
+  title: { color: colors.text, fontSize: 26, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6 },
   heading: { color: colors.text, fontSize: 20, fontWeight: '600' },
   body: { color: colors.text, fontSize: 15, lineHeight: 23 },
   muted: { color: colors.muted, fontSize: 13, lineHeight: 20 },

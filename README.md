@@ -4,7 +4,7 @@ A local-first personal trainer for running and cycling, built with Expo, React N
 
 ## Implementation status
 
-Version 0.1.8 connects the Adaptai teal A to Android's home-screen and app-list launcher icons, with a dark background, adaptive masks and a monochrome themed-icon layer. Version 0.1.7 introduced the Adaptai name and shared app header. Existing app identifiers, saved data and backup compatibility are retained.
+Version 0.1.9 saves screen space with a single-row brand header, smaller page headings and no per-tab subtitles. Working content retains its spacing and readable controls. Version 0.1.8 added the Adaptai launcher icon, including adaptive/themed variants. See [design guidelines](docs/ADAPTAI_BRAND.md) for the shared layout rules.
 
 Launcher assets are committed in `assets/brand/` and configured in `app.json`. To rebuild them after editing the polygon-based `adaptai-mark.svg`, run `python scripts/generate-launcher-icons.py` with Pillow installed. Expo prebuild generates all Android launcher densities and round/adaptive resources; changing only the JavaScript bundle does not update the installed launcher icon.
 

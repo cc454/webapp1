@@ -4,7 +4,7 @@ Rebrand this personal endurance training app as **Adaptai**. The tone is calm, p
 
 ## Architecture and integration
 
-This is an Expo / React Native app with Expo Router tabs. `src/ui.tsx` owns shared colors and styles. `src/screens.tsx` exports `Page`, used by Plan, Chat, Settings and Workout Library. `src/BrandHeader.tsx` replaces the old brand eyebrow in that shared page. Keep the existing page title, subtitle and navigation. `app.json` owns the app display name.
+This is an Expo / React Native app with Expo Router tabs. `src/ui.tsx` owns shared colors and styles. `src/screens.tsx` exports `Page`, used by Plan, Chat, Settings and Workout Library. `src/BrandHeader.tsx` renders the shared brand header. Keep page titles and navigation; omit per-tab marketing subtitles. `Page` deliberately has no subtitle property. `app.json` owns the app display name.
 
 ## Palette
 
@@ -20,7 +20,15 @@ Use one brand accent. Preserve semantic error styling. Keep current card spacing
 
 ## Logo and header
 
-Use the geometric ribbon-like teal A with a white **Adaptai** wordmark. `assets/brand/adaptai-mark.svg` is the transparent vector symbol; `adaptai-logo.svg` is a transparent horizontal lockup. The SVG lockup uses Arial/Helvetica/system sans-serif text, so font appearance can vary; convert the wordmark to outlines before print production if fixed typography is required. `adaptai-mark.png` is the matching high-resolution transparent native fallback; no SVG rendering dependency is needed. Keep clear space at least one quarter of the symbol height and avoid stretching. The header uses a 36px-high symbol with scalable native text and a restrained endurance-training descriptor. Allow wrapping at large accessibility font sizes; do not truncate the name.
+Use the geometric ribbon-like teal A with a white **Adaptai** wordmark. `assets/brand/adaptai-mark.svg` is the transparent vector symbol; `adaptai-logo.svg` is a transparent horizontal lockup. The SVG lockup uses Arial/Helvetica/system sans-serif text, so font appearance can vary; convert the wordmark to outlines before print production if fixed typography is required. `adaptai-mark.png` is the matching high-resolution transparent native fallback; no SVG rendering dependency is needed. Keep clear space at least one quarter of the symbol height and avoid stretching.
+
+Keep the shared header in one horizontal row: 26px-high symbol, 22px wordmark, then **PERSONAL ENDURANCE TRAINING** alongside it. Use 8px between symbol/name and 10px before the descriptor. The descriptor is a single line at 10px, reduced to 8px below a 360px viewport, with native font fitting for remaining space. Branding text allows at most 1.2× font scaling to keep this compact lockup; its full text remains available to screen readers. Do not apply that cap to page headings, body text, fields or controls.
+
+## Screen-space hierarchy
+
+Below the brand row show one page/tab heading at 26px with a 32px line height and 12px separation. Do not restore the removed Plan, Chat, Settings or Workout Library subtitles, and do not leave an empty subtitle row. Prioritize the plan, coach messages and actionable settings over repeated introductory copy. Preserve meaningful guidance, status/error messages and review disclosures.
+
+Save space in the shared header rather than squeezing working content: retain 22px page padding, 18px content gaps, 20px card padding, existing body typography and comfortable touch targets. Validate the complete inline descriptor at 320px and 360px widths and desktop width. Also check large text on Android: essential content must remain readable and scrollable, and the compact branding must not overlap the page heading or controls.
 
 The original conversation image was unavailable through the conversation reference. These assets interpret the supplied description, rather than claim an exact trace of that image.
 
