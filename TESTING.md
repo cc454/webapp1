@@ -8,6 +8,10 @@ All four page subtitles are removed, including the subtitle property on shared P
 
 Strict TypeScript, 135 tests across 21 suites and web export pass locally. The first cold test run timed out in the existing chat-success case during concurrent compilation; the complete warm rerun passed with no test changes. Browser inspection initially found descriptor clipping at 320px; reducing the wordmark and mark resolved it. Final measured text widths fit their available widths at 320px and 360px. All four tab subtitles are absent, and their page headings remain accessible. Native large-text/keyboard appearance remains a phone acceptance check.
 
+Native packaging and the final bundle refresh pass. APK verification confirms 0.1.9/code 10, Adaptai label, target API 36, ARM64/ARMv7 and the same upgrade signing certificate. The final bundle timestamp is later than the final header sizing change. For this UI-only refresh the existing native project was reused with version fields synchronized to app.json; a normal Expo prebuild also derives those fields from app.json. The preview check briefly stalled in automatic approval review; one retry succeeded and the temporary viewport was reset.
+
+Strict TypeScript, all 135 tests and web export also pass in [clean-install CI for final source 83b0b68](https://github.com/cc454/webapp1/actions/runs/37767788691).
+
 ## Launcher branding in 0.1.8
 
 The owner confirms the recent app changes work, but reported the Android robot launcher icon under the correct Adaptai name. The app had no Expo launcher icon configuration. Version 0.1.8 now uses PNGs rendered from the existing vector brand mark for legacy, adaptive and monochrome launcher layers. The adaptive artwork fits within its central safe circle; the background matches the app's near-black palette. No new design or provider requests are needed.
@@ -87,7 +91,7 @@ The 0.1.1 update replaces the web-cookie Garmin transport with mobile token auth
 
 ## Acceptance-case traceability
 
-Current APK 0.1.8 (version code 9): `artifacts/adaptai-release.apk`, 59,833,862 bytes. SHA-256: `ff2437fbc7a28adffa524f3fea90643edf2f8baf416759bae73708f25db2dc4c`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
+Current APK 0.1.9 (version code 10): `artifacts/adaptai-release.apk`, 59,833,874 bytes. SHA-256: `c8132546ea8c51f57b2c74112a62df24bf959e983bc121d3ef61041ed2d699f9`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
 
 Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md. “Pending” and “partial” are intentional: the Android release is not yet fully accepted.
 
@@ -137,7 +141,7 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-42 | Strict type checking passed. |
 | AT-43 | All 135 tests, strict checking, and web export passed in clean-install GitHub CI for 0.1.6; new native visual checks remain. |
 | AT-44 | Workspace-local SDK/JDK installed; native release packaging completed successfully with the Windows path fixes. |
-| AT-45 | Testing-only 0.1.6 APK built; signature matches the installed version, package and ARM architectures verified. Owner confirms recent updates work; new controls and upgrade visual check pending. |
+| AT-45 | Testing-only 0.1.9 APK built; signature matches the installed version, package and ARM architectures verified. Owner confirms earlier app changes work; compact layout/large-text phone check pending. |
 | AT-46 | Browser preview compiles and basic flows verified; broader responsive/backup checks pending. Optional. |
 | AT-47 | Deferred Garmin workout push. Optional. |
 | AT-48 | Deferred Garmin push retry tracking. Optional. |
