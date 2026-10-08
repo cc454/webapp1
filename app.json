@@ -3,11 +3,19 @@
     "name": "Adaptai",
     "slug": "stride-ai",
     "scheme": "stride-ai",
-    "version": "0.1.7",
+    "version": "0.1.8",
+    "icon": "./assets/brand/launcher-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B0F0F",
-    "android": { "package": "com.cc454.strideai", "allowBackup": false, "softwareKeyboardLayoutMode": "resize", "versionCode": 8 },
+    "android": {
+      "package": "com.cc454.strideai", "allowBackup": false, "softwareKeyboardLayoutMode": "resize", "versionCode": 9,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/launcher-foreground.png",
+        "backgroundColor": "#0B0F0F",
+        "monochromeImage": "./assets/brand/launcher-monochrome.png"
+      }
+    },
     "plugins": ["expo-router", "expo-secure-store", "expo-sqlite", "expo-document-picker", "./plugins/with-generation-service"],
     "web": { "bundler": "metro", "output": "single" }
   }

@@ -102,6 +102,12 @@ Confirmed: ten chats means ten conversation threads with their messages. Working
 | R-66 | Jump to the top of the latest coach message when opening/switching a conversation or receiving a reply, retaining top alignment when the keyboard changes available height. Allow manual scrolling afterward. | AT-66: Verify latest, rather than earlier, assistant layout coordinates drive scrolling; switch threads and receive a new reply. Check a short and long reply on Android with keyboard open/closed, then manually read earlier messages without forced jumps. |
 | R-67 | Offer Claude Sonnet 4.6, Claude Haiku 4.5 and Gemini 2.5 Flash in a model dropdown while retaining editable custom OpenRouter identifiers. Apply selection only on Save settings, preserving it across restart and using it for chat/planning. | AT-67: Select each preset, verify its exact provider ID and no automatic save, then save/restart. Type/save a custom ID and verify it is retained; inspect chat/plan requests for the chosen model. |
 
+## Required launcher branding
+
+| ID | Requirement | Test case |
+| --- | --- | --- |
+| R-68 | Use the existing Adaptai teal A as the Android home-screen/app-list icon, with a dark background, round/adaptive support and a monochrome layer for themed launchers. Keep the Adaptai label, package identity and upgrade signing. | AT-68: Prebuild and inspect all five launcher densities, adaptive foreground/background/monochrome references and safe artwork bounds. Inspect the built APK's icon resources and label, compare packaged images to generated assets, and verify version/signature for an in-place upgrade. Install over the existing phone app and check home/all-apps screens with normal and themed icons. |
+
 ## Known input issue and implementation decisions
 
 training/goal.md specifies Halbmarathon, 21.1 km, 2:00, 10 m elevation, on 11 April 2027, as updated by the owner. Legacy 5:30/km is superseded by computed 5:41/km.

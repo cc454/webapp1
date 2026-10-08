@@ -2,6 +2,12 @@
 
 Updated 8 October 2026. Passing automated cases are evidence for the named logic, not proof of native device behavior or real-service compatibility.
 
+## Launcher branding in 0.1.8
+
+The owner confirms the recent app changes work, but reported the Android robot launcher icon under the correct Adaptai name. The app had no Expo launcher icon configuration. Version 0.1.8 now uses PNGs rendered from the existing vector brand mark for legacy, adaptive and monochrome launcher layers. The adaptive artwork fits within its central safe circle; the background matches the app's near-black palette. No new design or provider requests are needed.
+
+Expo prebuild generates legacy/round icons and foreground/monochrome layers in all five Android density directories. Both adaptive XML resources reference the custom layers and dark background, and the app label remains Adaptai. Native packaging and final APK verification are recorded below. Home/all-apps appearance after upgrading and Android themed-icon presentation require a phone check.
+
 ## Plan, chat and model usability in 0.1.6
 
 The owner reports all recent changes work. The new update limits completion/uncompletion to today's running/cycling sessions, checks the device's local date again when saving, refreshes the calendar on foreground return, and displays English weekday labels. A collapsible entire-plan summary appears after the export/restore controls and includes saved strategy, progression, constraint decisions, sport totals and all phase weeks. Older plans still show their calendar, totals and phases.
@@ -145,6 +151,8 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-65 | navigation-ui.test.tsx expands/collapses saved strategy, full phase focus and totals, and verifies legacy plans without metadata. Native multiweek visual check pending. |
 | AT-66 | navigation-ui.test.tsx verifies latest coach coordinates, short-reply spacer, keyboard viewport resizing, thread switching, a new reply and returning to a retained tab. Native keyboard/manual scrolling check pending. |
 | AT-67 | navigation-ui.test.tsx checks exact preset IDs and custom editing without automatic save. chat-ui.test.tsx verifies preset/custom persistence and reload. Existing provider tests verify selected-model payloads. Native dropdown/live preset requests pending. |
+
+| AT-68 | Source assets and generated native launcher resources inspected: 1024px originals, transparent adaptive layers, central safe bounds, five densities and both round/adaptive XML files. Final APK and phone checks are recorded in the launcher section. |
 
 ## Device acceptance sequence
 
