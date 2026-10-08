@@ -85,7 +85,7 @@ export function PlanScreen() {
     </Card>}
   </Page>;
 }
-export function ChatScreen() {
+export function ChatScreen({ visit = 0 }: { visit?: number } = {}) {
   const app = useApp(); const [question, setQuestion] = useState('');
   const thread = app.state.threads.find(t => t.id === app.threadId);
   const scroll = useRef<ScrollView>(null);
@@ -96,6 +96,7 @@ export function ChatScreen() {
   function revealCoach() {
     if (!app.error && target.current?.key === targetKey) scroll.current?.scrollTo({ y: target.current!.y, animated: true });
   }
+  useEffect(() => { revealCoach(); }, [visit]);
   async function send() {
     const sent = question;
     if (await app.chat(sent)) setQuestion(value => value === sent ? '' : value);

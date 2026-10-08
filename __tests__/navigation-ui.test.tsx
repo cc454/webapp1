@@ -60,6 +60,8 @@ describe('AT-64–67: plan summary, chat position and model choices', () => {
     expect(scrollTo).not.toHaveBeenCalled();
     fireEvent(screen.getByTestId('chat-message-2'), 'layout', { nativeEvent: { layout: { y: 900 } } });
     expect(scrollTo).toHaveBeenLastCalledWith({ y: 900, animated: true });
+    scrollTo.mockClear(); view.rerender(<ChatScreen visit={1} />);
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 900, animated: true });
   });
   it('selects all presets without saving automatically and saves a typed custom model', () => {
     const app = setup(); render(<SettingsScreen />);
