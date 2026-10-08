@@ -8,6 +8,10 @@ The owner confirms the recent app changes work, but reported the Android robot l
 
 Expo prebuild generates legacy/round icons and foreground/monochrome layers in all five Android density directories. Both adaptive XML resources reference the custom layers and dark background, and the app label remains Adaptai. Native packaging and final APK verification are recorded below. Home/all-apps appearance after upgrading and Android themed-icon presentation require a phone check.
 
+The foreground's nontransparent pixels fit within a 299.87px radius of the 1024px canvas center, inside the 312.89px adaptive safe radius. The monochrome layer has matching alpha; the legacy icon is fully opaque. Source/generated artwork was visually inspected, including the round launcher resource. Standard typecheck, automated tests and web export pass in [clean-install CI for source d8f8506](https://github.com/cc454/webapp1/actions/runs/37756193046).
+
+Native release packaging passes. The final APK is 0.1.8/code 9, labelled Adaptai, with target API 36, ARM64/ARMv7 and the same signing certificate. All 20 packaged launcher images were resolved through the optimized resource table and match the generated custom WebP files byte-for-byte. Both compiled adaptive XMLs reference foreground/monochrome resources and the #0B0F0F background. The APK is ready for an in-place phone upgrade; physical launcher/theme verification remains with the owner.
+
 ## Plan, chat and model usability in 0.1.6
 
 The owner reports all recent changes work. The new update limits completion/uncompletion to today's running/cycling sessions, checks the device's local date again when saving, refreshes the calendar on foreground return, and displays English weekday labels. A collapsible entire-plan summary appears after the export/restore controls and includes saved strategy, progression, constraint decisions, sport totals and all phase weeks. Older plans still show their calendar, totals and phases.
@@ -77,7 +81,7 @@ The 0.1.1 update replaces the web-cookie Garmin transport with mobile token auth
 
 ## Acceptance-case traceability
 
-Current APK 0.1.6 (version code 7): `artifacts/stride-ai-release.apk`, 59,822,368 bytes. SHA-256: `93e4c3f09178a2b2e0b6ec48612dcb66804d384035586e51ee52aa07ebb053a6`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
+Current APK 0.1.8 (version code 9): `artifacts/adaptai-release.apk`, 59,833,862 bytes. SHA-256: `ff2437fbc7a28adffa524f3fea90643edf2f8baf416759bae73708f25db2dc4c`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
 
 Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md. “Pending” and “partial” are intentional: the Android release is not yet fully accepted.
 
@@ -152,7 +156,7 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-66 | navigation-ui.test.tsx verifies latest coach coordinates, short-reply spacer, keyboard viewport resizing, thread switching, a new reply and returning to a retained tab. Native keyboard/manual scrolling check pending. |
 | AT-67 | navigation-ui.test.tsx checks exact preset IDs and custom editing without automatic save. chat-ui.test.tsx verifies preset/custom persistence and reload. Existing provider tests verify selected-model payloads. Native dropdown/live preset requests pending. |
 
-| AT-68 | Source assets and generated native launcher resources inspected: 1024px originals, transparent adaptive layers, central safe bounds, five densities and both round/adaptive XML files. Final APK and phone checks are recorded in the launcher section. |
+| AT-68 | Source and generated assets inspected; safe bounds verified. All 20 packaged launcher images match generated assets, both compiled adaptive XMLs reference custom layers/dark background, and APK label/version/signature are verified. Home/all-apps and themed-icon checks await phone upgrade. |
 
 ## Device acceptance sequence
 

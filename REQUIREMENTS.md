@@ -57,7 +57,7 @@ Confirmed: ten chats means ten conversation threads with their messages. Working
 | R-41 | Explain context sharing through OpenRouter and its selected downstream model provider; exclude secrets from ordinary state, logs, exports, and backups; encrypt API keys/passwords/session metadata. | AT-41: Review disclosure; inspect state/logs/outputs with secret sentinels; verify Android secure storage for each secret. |
 | R-42 | Pass strict TypeScript checking. | AT-42: Run documented typecheck command on a clean checkout; require strict configuration and zero exit code. |
 | R-43 | Maintain automated tests for dates/constraints, generation/review, providers, storage, imports, exports, backup/restore, chats, Garmin, and primary UI flows. | AT-43: Run documented test command; require passing meaningful cases for each area and traceability to AT IDs. |
-| R-44 | Document reproducible Android builds independent of Ona: prerequisites, commands, signing, and output artifacts/stride-ai-release.apk. | AT-44: Follow README in a clean non-Ona environment; build and verify APK at the stated path. |
+| R-44 | Document reproducible Android builds independent of Ona: prerequisites, commands, signing, and output artifacts/adaptai-release.apk. | AT-44: Follow README in a clean non-Ona environment; build and verify APK at the stated path. |
 | R-45 | Document testing-only signing if used and verify installation/upgrades preserving data on the owner's device. | AT-45: Compare APK signing to documentation; install, populate data, and upgrade with same signing identity; verify preserved plan/chats/settings. |
 
 ## Optional enhancements
