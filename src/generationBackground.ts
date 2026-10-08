@@ -29,7 +29,7 @@ export async function withGenerationBackground<T>(task: () => Promise<T>, onCanc
           try { await BackgroundService.stop(); } catch { /* Keep the original error. */ }
           reject(error);
         }
-      }, { taskName: 'StridePlanGeneration', taskTitle: 'Creating your training plan', taskDesc: 'Preparing your proposal…', taskIcon: { name: 'ic_launcher', type: 'mipmap' }, color: '#C6E887', linkingURI: 'stride-ai:///' }).catch(reject);
+      }, { taskName: 'StridePlanGeneration', taskTitle: 'Creating your training plan', taskDesc: 'Preparing your proposal…', taskIcon: { name: 'ic_launcher', type: 'mipmap' }, color: '#24CEB1', linkingURI: 'stride-ai:///' }).catch(reject);
     });
   } finally { active = false; cancel = undefined; publish(''); }
 }

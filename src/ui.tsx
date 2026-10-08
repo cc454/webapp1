@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
-export const colors = { bg: '#101213', panel: '#191D1F', edge: '#303739', muted: '#A3AEAE', text: '#F2F5F0', accent: '#C6E887', error: '#FFAD9D' };
+export const colors = { bg: '#0B0F0F', panel: '#141A1A', edge: '#303739', muted: '#8A9491', text: '#F5F7F6', accent: '#24CEB1', error: '#FFAD9D' };
 export function Button({ title, onPress, disabled, secondary = false }: { title: string; onPress: () => void; disabled?: boolean; secondary?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [s.button, secondary && s.secondary, (disabled || pressed) && { opacity: 0.5 }]}><Text style={{ color: secondary ? colors.text : colors.bg, fontWeight: '700', fontSize: 14 }}>{title}</Text></Pressable>;
 }

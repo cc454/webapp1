@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "Stride AI",
+    "name": "Adaptai",
     "slug": "stride-ai",
     "scheme": "stride-ai",
-    "version": "0.1.6",
+    "version": "0.1.7",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "android": { "package": "com.cc454.strideai", "allowBackup": false, "softwareKeyboardLayoutMode": "resize", "versionCode": 7 },
+    "backgroundColor": "#0B0F0F",
+    "android": { "package": "com.cc454.strideai", "allowBackup": false, "softwareKeyboardLayoutMode": "resize", "versionCode": 8 },
     "plugins": ["expo-router", "expo-secure-store", "expo-sqlite", "expo-document-picker", "./plugins/with-generation-service"],
     "web": { "bundler": "metro", "output": "single" }
   }

@@ -10,13 +10,14 @@ import { constraintIssues } from './constraints';
 import { ChatMarkdown } from './ChatMarkdown';
 import { FitnessSettings } from './FitnessSettings';
 import { ModelSelector } from './ModelSelector';
+import { BrandHeader } from './BrandHeader';
 
 export function Page({ title, subtitle, children, footer, scrollRef, onViewport, onContentChange }: { title: string; subtitle: string; children: React.ReactNode; footer?: React.ReactNode; scrollRef?: React.RefObject<ScrollView | null>; onViewport?: (height: number) => void; onContentChange?: () => void }) {
   const app = useApp();
   const scroll = useRef<ScrollView>(null);
   useEffect(() => { if (app.error || (!scrollRef && (app.busy || app.notice))) (scrollRef ?? scroll).current?.scrollTo({ y: 0, animated: true }); }, [app.busy, app.error, app.notice, scrollRef]);
   return <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView ref={scrollRef ?? scroll} testID="page-scroll" onLayout={event => onViewport?.(event.nativeEvent.layout.height)} onContentSizeChange={onContentChange} style={s.page} keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
-    <Text style={s.eyebrow}>STRIDE / PERSONAL TRAINING</Text><Text style={s.title}>{title}</Text><Text style={s.muted}>{subtitle}</Text>
+    <BrandHeader /><Text accessibilityRole="header" style={s.title}>{title}</Text><Text style={s.muted}>{subtitle}</Text>
     {!app.ready && <ActivityIndicator color={colors.accent} />}
     {!!app.busy && <Card><View style={s.row}><ActivityIndicator color={colors.accent} /><Text style={s.body}>{app.busy}</Text></View>{/^(Generating|Repairing)/.test(app.busy) && <Button title="Cancel generation" secondary onPress={app.cancelGeneration} />}</Card>}
     {!!app.error && <Card><Text accessibilityRole="alert" style={s.error}>{app.error}</Text></Card>}

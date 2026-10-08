@@ -20,6 +20,6 @@ function fold(line: string) {
 }
 export function ics(event: EventDetails, workouts: Workout[], now = new Date()) {
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Stride AI//Training//EN', 'CALSCALE:GREGORIAN',
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Adaptai//Training//EN', 'CALSCALE:GREGORIAN',
     ...workouts.flatMap(w => ['BEGIN:VEVENT', `UID:${calendarEscape(`${event.date}-${encodeURIComponent(event.name)}-${w.id}@stride-ai`)}`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${w.date.replace(/-/g, '')}`, `SUMMARY:${calendarEscape(w.title)}`, `DESCRIPTION:${calendarEscape(`${w.sport} · ${duration(w.durationSeconds)}\n${w.detail}`)}`, 'END:VEVENT']), 'END:VCALENDAR'].map(fold).join('\r\n') + '\r\n';
 }

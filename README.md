@@ -1,8 +1,10 @@
-# Stride AI
+# Adaptai
 
 A local-first personal trainer for running and cycling, built with Expo, React Native, and TypeScript. Plans run from creation through your event date. Initial plans and revisions remain proposals until you review and accept them.
 
 ## Implementation status
+
+Version 0.1.7 rebrands the app as Adaptai with a teal ribbon A, shared accessible header and near-black palette. Existing app identifiers, saved data and backup compatibility are retained.
 
 The app now includes Plan, Chat, Workout Library, and Settings; goal/guidance imports; rolling seven-day views; plan validation and review; OpenRouter coaching; ten conversation threads; SQLite persistence on Android; exports; and versioned plan backup/restore. A browser preview uses local browser storage and memory-only API keys.
 
@@ -39,7 +41,7 @@ powershell -ExecutionPolicy Bypass -File scripts/bootstrap-android.ps1
 pnpm build:android
 ```
 
-The bootstrap script downloads the JDK and Google command-line tools into ignored `.tools/` and prompts for SDK license review. Use `-AcceptLicenses` only after explicitly authorizing acceptance. The build runs in the workspace and outputs `artifacts/stride-ai-release.apk`.
+The bootstrap script downloads the JDK and Google command-line tools into ignored `.tools/` and prompts for SDK license review. Use `-AcceptLicenses` only after explicitly authorizing acceptance. The build runs in the workspace and outputs `artifacts/adaptai-release.apk`.
 
 The pnpm 11 dependency layout is configured in `pnpm-workspace.yaml` ([pnpm migration guide](https://pnpm.io/docs/migration)). On Windows, the build script temporarily maps an unused drive letter to an SDK path containing spaces, avoiding CMake's incorrect short-name treatment of `clang++.exe`. It also maps the Gradle cache to an unused drive letter and places native caches under the short SDK path and removes only its own mapping afterward. Phone builds include ARM64 and ARMv7. Pass `-Architectures "arm64-v8a,armeabi-v7a,x86,x86_64"` for emulator binaries. To retry Gradle without regenerating the native project, pass `-SkipPrebuild` to `scripts/build-android.ps1`.
 
@@ -107,3 +109,5 @@ Browser storage is local to that browser; there is no cross-device sync. Browser
 - [Requirements and acceptance cases](REQUIREMENTS.md)
 - [Development plan](DEVELOPMENT_PLAN.md)
 - [Verification evidence and remaining device checks](TESTING.md)
+
+Brand assets live in `assets/brand`; `src/BrandHeader.tsx` renders the shared page header. See `docs/ADAPTAI_BRAND.md` for brand and compatibility guidance.
