@@ -6,9 +6,13 @@ Updated 8 October 2026. Passing automated cases are evidence for the named logic
 
 The owner reports all recent changes work. The new update limits completion/uncompletion to today's running/cycling sessions, checks the device's local date again when saving, refreshes the calendar on foreground return, and displays English weekday labels. A collapsible entire-plan summary appears after the export/restore controls and includes saved strategy, progression, constraint decisions, sport totals and all phase weeks. Older plans still show their calendar, totals and phases.
 
-Chat scrolls to the layout position of the latest coach message when it arrives or a conversation opens; earlier message layouts cannot replace the target. A viewport-sized space below the conversation permits even a short reply to align at its top. Keyboard resizing updates that space. Manual scrolling does not trigger automatic jumps. Error feedback still scrolls into view. The model dropdown provides Sonnet 4.6, Haiku 4.5 and Gemini 2.5 Flash, retaining the editable identifier and explicit Save settings behavior.
+Chat scrolls to the layout position of the latest coach message when it arrives, a conversation opens, or the owner returns to the retained Chat tab; earlier message layouts cannot replace the target. A viewport-sized space below the conversation permits even a short reply to align at its top. Keyboard resizing updates that space. Manual scrolling does not trigger automatic jumps. Error feedback still scrolls into view. The model dropdown provides Sonnet 4.6, Haiku 4.5 and Gemini 2.5 Flash, retaining the editable identifier and explicit Save settings behavior.
 
 Regression cases cover today's completion/uncompletion persistence, future/rest exclusion and a stale button pressed after midnight; exact Thursday date formatting; expanded/collapsed modern and legacy summaries; latest-reply layout, thread switching, new replies and keyboard viewport changes; all three preset IDs, custom editing, persistence and reload. Android visual acceptance of these new controls remains to be checked on the phone. No live provider requests were needed for these changes.
+
+Strict TypeScript, all 135 tests across 21 suites and web export pass in [clean-install GitHub CI for final source fb0c63c](https://github.com/cc454/webapp1/actions/runs/37738844795). Browser inspection confirms all model dropdown choices and the editable identifier; no settings were saved during that inspection.
+
+Native release packaging and the final incremental bundle refresh pass. APK verification confirms 0.1.6/code 7, target API 36, ARM64/ARMv7 and the installed app's signing certificate. Bundle timestamps are later than the final route/screen edits, including the retained-tab focus fix.
 
 ## Draft discard/restart and 0.1.5 update
 
@@ -67,7 +71,7 @@ The 0.1.1 update replaces the web-cookie Garmin transport with mobile token auth
 
 ## Acceptance-case traceability
 
-Current APK 0.1.5 (version code 6): `artifacts/stride-ai-release.apk`, 59,816,868 bytes. SHA-256: `6036e50a2283e807808265b2f1a354358bb09ab1d962907d0b8f2abd8838d594`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
+Current APK 0.1.6 (version code 7): `artifacts/stride-ai-release.apk`, 59,822,368 bytes. SHA-256: `93e4c3f09178a2b2e0b6ec48612dcb66804d384035586e51ee52aa07ebb053a6`. Testing-only debug certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. Install over the existing app to preserve local data.
 
 Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md. “Pending” and “partial” are intentional: the Android release is not yet fully accepted.
 
@@ -115,9 +119,9 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 | AT-40 | llm.test.ts checks endpoint/auth and exclusion of Garmin email; full device traffic inspection pending. |
 | AT-41 | Native SecureStore calls tested and disclosure implemented; native state/log/network inspection pending. |
 | AT-42 | Strict type checking passed. |
-| AT-43 | All 128 tests, strict checking, and web export passed in clean-install GitHub CI for 0.1.5; several manual acceptance checks remain. |
+| AT-43 | All 135 tests, strict checking, and web export passed in clean-install GitHub CI for 0.1.6; new native visual checks remain. |
 | AT-44 | Workspace-local SDK/JDK installed; native release packaging completed successfully with the Windows path fixes. |
-| AT-45 | Testing-only 0.1.5 APK built; signature matches the installed version, package and ARM architectures verified. Owner confirmed earlier phone installation; current discard/library/upgrade/metric/plan rechecks pending. |
+| AT-45 | Testing-only 0.1.6 APK built; signature matches the installed version, package and ARM architectures verified. Owner confirms recent updates work; new controls and upgrade visual check pending. |
 | AT-46 | Browser preview compiles and basic flows verified; broader responsive/backup checks pending. Optional. |
 | AT-47 | Deferred Garmin workout push. Optional. |
 | AT-48 | Deferred Garmin push retry tracking. Optional. |
@@ -139,7 +143,7 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 
 | AT-64 | navigation-ui.test.tsx checks Thursday 2026-10-08; restore-ui.test.tsx verifies rendered local calendar weekday. Native timezone/date rollover check pending. |
 | AT-65 | navigation-ui.test.tsx expands/collapses saved strategy, full phase focus and totals, and verifies legacy plans without metadata. Native multiweek visual check pending. |
-| AT-66 | navigation-ui.test.tsx verifies latest coach coordinates, short-reply spacer, keyboard viewport resizing, thread switching and a new reply. Native keyboard/manual scrolling check pending. |
+| AT-66 | navigation-ui.test.tsx verifies latest coach coordinates, short-reply spacer, keyboard viewport resizing, thread switching, a new reply and returning to a retained tab. Native keyboard/manual scrolling check pending. |
 | AT-67 | navigation-ui.test.tsx checks exact preset IDs and custom editing without automatic save. chat-ui.test.tsx verifies preset/custom persistence and reload. Existing provider tests verify selected-model payloads. Native dropdown/live preset requests pending. |
 
 ## Device acceptance sequence
