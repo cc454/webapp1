@@ -5,7 +5,6 @@ import { parameterNames, TrainingOutline, WorkoutBlock, WorkoutParameters } from
 import { emptyState } from '../src/defaults';
 import { GenerationDraft } from '../src/types';
 import { fixturePlan } from './fixtures';
-import { encodeBackup, decodeBackup } from '../src/backup';
 const library=parseWorkoutLibrary(defaultWorkoutLibrary);
 const parameters=(id:string):WorkoutParameters=>({...Object.fromEntries(parameterNames.map(k=>[k,library.templates.find(t=>t.id===id)!.sports.run.parameters[k][1]])),ftpPercent:null}) as WorkoutParameters;
 const outline=():TrainingOutline=>({strategy:'Build gradually, recover, then taper to the event; use mostly easy work.',constraintDecisions:[],
@@ -28,7 +27,6 @@ describe('High-level LLM planning and local assembly',()=>{
     const copies=plan.workouts.filter(w=>w.templateId==='ENDURANCE');expect(copies).toHaveLength(4);expect(new Set(copies.map(w=>w.id)).size).toBe(4);
     copies[0]!.steps[0]!.seconds=1;expect(copies[1]!.steps[0]!.seconds).toBe(1800);
     expect(draft!.pipeline).toBe('library');expect(draft!.blocks).toHaveLength(1);
-    const clean=assembleLibraryPlan(outline(),blocks(),library,state,'2027-04-05','2027-04-11');expect(decodeBackup(encodeBackup(clean))).toEqual(clean);
     // Stored drafts from older builds used unsorted JSON signature keys.
     draft!.signature=JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(draft!.signature)).reverse()));
     (fetch as jest.Mock).mockClear();await generateLibraryPlan(state,'key','',()=>{},undefined,{draft,save:async()=>{}});expect(fetch).not.toHaveBeenCalled();

@@ -3,13 +3,13 @@
     "name": "Adaptai",
     "slug": "stride-ai",
     "scheme": "stride-ai",
-    "version": "0.1.9",
+    "version": "0.2.1",
     "icon": "./assets/brand/launcher-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B0F0F",
     "android": {
-      "package": "com.cc454.strideai", "allowBackup": false, "softwareKeyboardLayoutMode": "resize", "versionCode": 10,
+      "package": "com.cc454.strideai", "allowBackup": false, "softwareKeyboardLayoutMode": "resize", "versionCode": 12,
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/launcher-foreground.png",
         "backgroundColor": "#0B0F0F",

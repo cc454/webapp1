@@ -9,96 +9,124 @@ import React from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import App from '../App';
 import { loadState, saveState, getApiKey, loadGenerationDraft, clearGenerationDraft } from '../src/storage';
-import { generatePlan } from '../src/llm';
+import { pickMarkdownFile } from '../src/markdown';
+import { addDays, today } from '../src/dates';
+import { importPlan, trainingPlanTemplate } from '../src/trainingPlan';
 import { emptyState } from '../src/defaults';
 import { fixturePlan } from './fixtures';
 import { isConnected, pullActivitySummaries, pullFitness } from '../src/garmin';
 import { AppProvider } from '../src/appContext';
-import { SettingsScreen, PlanScreen } from '../src/screens';
-import { subscribeGeneration } from '../src/generationBackground';
+import { ChatScreen, SettingsScreen, PlanScreen } from '../src/screens';
+import { askCoach } from '../src/llm';
 describe('AT-14,32,38: rendered app flows', () => {
   beforeEach(() => { (saveState as jest.Mock).mockResolvedValue(undefined); (getApiKey as jest.Mock).mockResolvedValue('fixture-key'); (clearGenerationDraft as jest.Mock).mockResolvedValue(undefined); });
-  it('renders empty onboarding without saving on startup', async () => {
-    (loadState as jest.Mock).mockResolvedValue(emptyState()); render(<App />);
-    await screen.findByText('Start with your event'); expect(saveState).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Generate initial plan' })).toBeDisabled();
+  it('imports a template without generating or saving at startup', async () => {
+    (loadState as jest.Mock).mockResolvedValue(emptyState());
+    (pickMarkdownFile as jest.Mock).mockResolvedValue(trainingPlanTemplate);
+    render(<App />);
+    const button = await screen.findByRole('button', { name: 'Import Markdown plan' });
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(saveState).not.toHaveBeenCalled();
+    fireEvent.press(button);
+    await screen.findByText('Spring endurance');
+    expect((saveState as jest.Mock).mock.calls.at(-1)[0].plan.workouts).toHaveLength(1);
   });
-  it('requires explicit acceptance and prevents duplicate generation', async () => {
-    const state = emptyState(); state.event = fixturePlan().event; (loadState as jest.Mock).mockResolvedValue(state);
-    let resolve!: (value: ReturnType<typeof fixturePlan>) => void;
-    (generatePlan as jest.Mock).mockImplementation(() => new Promise(r => { resolve = r; })); render(<App />);
-    const button = await screen.findByRole('button', { name: 'Generate initial plan' });
-    await waitFor(() => expect(button).toBeEnabled()); fireEvent.press(button); fireEvent.press(button);
-    await waitFor(() => expect(generatePlan).toHaveBeenCalledTimes(1)); resolve({...fixturePlan(),strategy:'Review this recovery and taper strategy.',progressions:[],constraintDecisions:['Prioritize the enforced rest quota.']});
-    await screen.findByText('PROPOSAL / NOT SAVED'); expect(saveState).not.toHaveBeenCalled();
-    expect(screen.getByText('Review this recovery and taper strategy.')).toBeTruthy();expect(screen.getByText('Constraint decision: Prioritize the enforced rest quota.')).toBeTruthy();
-    fireEvent.press(screen.getByRole('button',{name:'Review proposed phase progression'}));expect(screen.getByText('2027-04-05 → 2027-04-11 · Taper')).toBeTruthy();expect(saveState).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByRole('button', { name: 'Accept and save' }));
-    await waitFor(() => expect(saveState).toHaveBeenCalledTimes(1)); expect((saveState as jest.Mock).mock.calls[0][0].plan).not.toBeNull();
+  it('leaves the active plan intact after a failed import', async () => {
+    const state = { ...emptyState(), plan: fixturePlan() };
+    (loadState as jest.Mock).mockResolvedValue(state);
+    (pickMarkdownFile as jest.Mock).mockResolvedValue('# A broken plan');
+    render(<App />);
+    const button = await screen.findByRole('button', { name: 'Import Markdown plan' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.press(button);
+    await screen.findByText('Add a Training goal or Event goal followed by ## Schedule.');
+    expect(saveState).not.toHaveBeenCalled();
+    expect(screen.getByText(state.plan.event.name)).toBeTruthy();
+  });
+  it('keeps imported completion notes and effort on reimport', async () => {
+    const state = emptyState();
+    const text = trainingPlanTemplate.replace('2027-03-01', today());
+    state.plan = importPlan(text, state.settings.rules, today());
+    (loadState as jest.Mock).mockResolvedValue(state);
+    (pickMarkdownFile as jest.Mock).mockResolvedValue(text.replace('30 min', '30 min\n- Completed: yes\n- Completion note: Half done\n- Exertion: 5'));
+    render(<App />);
+    const button = await screen.findByRole('button', { name: 'Import Markdown plan' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.press(button);
+    await screen.findByText('Half done');
+    expect((saveState as jest.Mock).mock.calls.at(-1)[0].plan.workouts[0]).toMatchObject({ completed: true, exertion: 5 });
+  });
+  it('marks a proposal stale after a successful plan import', async () => {
+    const state = emptyState();
+    const text = trainingPlanTemplate.replace('2027-03-01', today());
+    state.plan = importPlan(text, state.settings.rules, today());
+    (loadState as jest.Mock).mockResolvedValue(state);
+    (pickMarkdownFile as jest.Mock).mockResolvedValue(text);
+    (askCoach as jest.Mock).mockResolvedValue(JSON.stringify([{ action: 'move', id: state.plan.workouts[0]!.id, date: addDays(today(), 1) }]));
+    render(<AppProvider><ChatScreen /><PlanScreen /></AppProvider>);
+    const propose = await screen.findByRole('button', { name: 'Propose plan changes' });
+    fireEvent.changeText(screen.getByLabelText('What would you like to discuss?'), 'Move my session.');
+    await waitFor(() => expect(propose).toBeEnabled());
+    fireEvent.press(propose);
+    await screen.findByText('PROPOSAL / NOT SAVED');
+    expect(saveState).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByRole('button', { name: 'Import Markdown plan' }));
+    await screen.findByText(/This proposal is stale/);
+    expect(screen.getByRole('button', { name: 'Accept and save' })).toBeDisabled();
+  });
+  it('records binary completion with a note and exertion on today’s workout', async () => {
+    const state = emptyState();
+    state.plan = importPlan(trainingPlanTemplate.replace('2027-03-01', today()), state.settings.rules, today());
+    (loadState as jest.Mock).mockResolvedValue(state);
+    render(<App />);
+    await screen.findByText('Run · Easy');
+    fireEvent.changeText(screen.getByLabelText('Completion note (optional)'), 'Stopped at 20 minutes');
+    fireEvent.changeText(screen.getByLabelText(/Perceived exertion/), '7');
+    fireEvent.press(screen.getByRole('button', { name: 'Mark complete' }));
+    await screen.findByText('Perceived exertion 7/10');
+    expect((saveState as jest.Mock).mock.calls.at(-1)[0].plan.workouts[0]).toMatchObject({
+      completed: true, completionNote: 'Stopped at 20 minutes', exertion: 7,
+    });
+  });
+  it('moves a past incomplete prescription intact and swaps two eligible workouts', async () => {
+    const state = emptyState();
+    const first = today();
+    const second = addDays(first, 1);
+    const missed = addDays(first, -1);
+    const text = trainingPlanTemplate.replace('2027-03-01', missed) +
+      `\n### ${first}\n#### Ride · Easy\n- Title: Recovery ride\n- Distance: 15 km\n`;
+    state.plan = importPlan(text, state.settings.rules, first);
+    (loadState as jest.Mock).mockResolvedValue(state);
+    state.activities = [{ id: 1, name: 'Synced morning run', sport: 'run', startedAt: `${missed}T12:00:00`, durationSeconds: 1800, distanceKm: 5 }];
+    render(<App />);
+    await screen.findByText('Entire plan summary');
+    expect(screen.queryByText('Aerobic run')).toBeNull();
+    expect(screen.queryByText('Synced morning run')).toBeNull();
+    expect(screen.queryByRole('button', { name: /restore.*backup/i })).toBeNull();
+    fireEvent.press(await screen.findByRole('button', { name: 'Show past workouts and activities' }));
+    expect(screen.getByText('Synced morning run')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Hide past workouts and activities' }));
+    expect(screen.queryByText('Synced morning run')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Show past workouts and activities' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Reschedule' }));
+    expect(screen.queryByLabelText('Prescription')).toBeNull();
+    fireEvent.changeText(screen.getByLabelText('Date (YYYY-MM-DD)'), second);
+    fireEvent.press(screen.getByRole('button', { name: 'Save workout' }));
+    await waitFor(() => expect(saveState).toHaveBeenCalledTimes(1));
+    const past = state.plan.workouts[0]!;
+    expect((saveState as jest.Mock).mock.calls[0][0].plan.workouts[1]).toEqual({ ...past, date: second });
+    fireEvent.press(screen.getAllByRole('button', { name: 'Edit workout' })[0]!);
+    fireEvent.press(screen.getByRole('button', { name: 'Select workout to swap' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Swap with selected workout' }));
+    await waitFor(() => expect(saveState).toHaveBeenCalledTimes(2));
+    expect((saveState as jest.Mock).mock.calls[1][0].plan.workouts.map((w: { title: string; date: string }) => [w.title, w.date]))
+      .toEqual([['Aerobic run', first], ['Recovery ride', second]]);
   });
   it('shows recovery without overwriting corrupt state', async () => {
-    (loadState as jest.Mock).mockRejectedValue(new Error('Damaged data')); render(<App />);
-    await screen.findByText('Damaged data'); expect(saveState).not.toHaveBeenCalled();
-  });
-  it('recovers a complete draft as a review without activating it or calling the model', async () => {
-    const state=emptyState(); const plan=fixturePlan(); state.event=plan.event;
-    (loadState as jest.Mock).mockResolvedValue(state); (loadGenerationDraft as jest.Mock).mockResolvedValueOnce({version:1,request:'',signature:'saved-inputs',start:plan.start,end:plan.end,workouts:plan.workouts,overview:plan.overview});
-    render(<AppProvider><PlanScreen /></AppProvider>); await screen.findByText('PROPOSAL / NOT SAVED');
-    expect(saveState).not.toHaveBeenCalled(); expect(generatePlan).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByRole('button',{name:'Reject'})); await waitFor(()=>expect(clearGenerationDraft).toHaveBeenCalled()); expect(saveState).not.toHaveBeenCalled();
-  });
-  it('allows a damaged draft to be discarded without resetting the valid active plan',async()=>{
-    const state=emptyState(); state.plan=fixturePlan();state.event=state.plan.event;
-    (loadState as jest.Mock).mockResolvedValue(state);(loadGenerationDraft as jest.Mock).mockRejectedValueOnce(new Error('Draft damaged'));
-    render(<AppProvider><PlanScreen /></AppProvider>);await screen.findByText('Draft damaged');expect(saveState).not.toHaveBeenCalled();
-    expect(screen.getByRole('button',{name:'Resume generation'})).toBeDisabled();
-    fireEvent.press(screen.getByRole('button',{name:'Discard saved draft'}));fireEvent.press(screen.getByRole('button',{name:'Confirm discard draft'}));
-    await waitFor(()=>expect(clearGenerationDraft).toHaveBeenCalled());expect(saveState).not.toHaveBeenCalled();
-  });
-  it('requires visible confirmation, then clears an incompatible draft and starts generation without it',async()=>{
-    const state=emptyState();state.event=fixturePlan().event;
-    const saved={version:1,request:'',signature:'old-inputs',start:'2027-04-05',end:'2027-04-11',pipeline:'library',workouts:[],overview:[]};
-    (loadState as jest.Mock).mockResolvedValue(state);(loadGenerationDraft as jest.Mock).mockResolvedValueOnce(saved);
-    render(<AppProvider><PlanScreen/></AppProvider>);await screen.findByText('Saved generation draft');
-    expect(screen.getByRole('button',{name:'Resume generation'})).toBeDisabled();expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeDisabled();
-    fireEvent.press(screen.getByRole('button',{name:'Discard saved draft'}));await screen.findByText('Discard saved draft?');expect(clearGenerationDraft).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByRole('button',{name:'Keep saved draft'}));expect(clearGenerationDraft).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByRole('button',{name:'Discard saved draft'}));fireEvent.press(screen.getByRole('button',{name:'Confirm discard draft'}));
-    await screen.findByText('Generation draft discarded. You can start a fresh proposal.');await waitFor(()=>expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeEnabled());
-    (generatePlan as jest.Mock).mockResolvedValueOnce(fixturePlan());fireEvent.press(screen.getByRole('button',{name:'Generate initial plan'}));await screen.findByText('PROPOSAL / NOT SAVED');
-    expect((generatePlan as jest.Mock).mock.calls[0][5].draft).toBeNull();expect(saveState).not.toHaveBeenCalled();
-  });
-  it('does not resurrect a discarded draft when a background read finishes late',async()=>{
-    const state=emptyState();state.event=fixturePlan().event;
-    const saved={version:1,request:'',signature:'old-inputs',start:'2027-04-05',end:'2027-04-11',pipeline:'library',workouts:[],overview:[]};
-    let finishRead!:(value:typeof saved)=>void;
-    (loadState as jest.Mock).mockResolvedValue(state);(loadGenerationDraft as jest.Mock).mockResolvedValueOnce(saved).mockImplementationOnce(()=>new Promise(resolve=>{finishRead=resolve;}));
-    render(<AppProvider><PlanScreen/></AppProvider>);await screen.findByText('Saved generation draft');
-    const listener=(subscribeGeneration as jest.Mock).mock.calls[0][0];act(()=>listener('Generating overall progression…'));act(()=>listener(''));
-    await waitFor(()=>expect(loadGenerationDraft).toHaveBeenCalledTimes(2));
-    fireEvent.press(screen.getByRole('button',{name:'Discard saved draft'}));fireEvent.press(screen.getByRole('button',{name:'Confirm discard draft'}));
-    await waitFor(()=>expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeEnabled());
-    await act(async()=>finishRead(saved));expect(screen.queryByText('Saved generation draft')).toBeNull();expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeEnabled();
-  });
-  it('keeps the confirmation open and the draft intact if deletion fails, then permits retry',async()=>{
-    const state=emptyState();state.event=fixturePlan().event;
-    (loadState as jest.Mock).mockResolvedValue(state);(loadGenerationDraft as jest.Mock).mockResolvedValueOnce({version:1,request:'',signature:'old-inputs',start:'2027-04-05',end:'2027-04-11',pipeline:'library',workouts:[],overview:[]});
-    (clearGenerationDraft as jest.Mock).mockRejectedValueOnce(new Error('Could not remove saved draft.'));
-    render(<AppProvider><PlanScreen/></AppProvider>);await screen.findByText('Saved generation draft');
-    fireEvent.press(screen.getByRole('button',{name:'Discard saved draft'}));fireEvent.press(screen.getByRole('button',{name:'Confirm discard draft'}));
-    await waitFor(()=>expect(screen.getByRole('button',{name:'Confirm discard draft'})).toBeEnabled());expect(screen.getByText('Discard saved draft?')).toBeTruthy();
-    expect(screen.getAllByText('Could not remove saved draft.').length).toBeGreaterThan(0);expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeDisabled();
-    fireEvent.press(screen.getByRole('button',{name:'Confirm discard draft'}));await screen.findByText('Generation draft discarded. You can start a fresh proposal.');expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeEnabled();
-  });
-  it('also clears a proposal that arrives while discard confirmation is open',async()=>{
-    const state=emptyState();const plan=fixturePlan();state.event=plan.event;
-    const partial={version:1,request:'',signature:'saved-inputs',start:plan.start,end:plan.end,workouts:[],overview:[]};
-    (loadState as jest.Mock).mockResolvedValue(state);(loadGenerationDraft as jest.Mock).mockResolvedValueOnce(partial).mockResolvedValueOnce({...partial,workouts:plan.workouts,overview:plan.overview});
-    render(<AppProvider><PlanScreen/></AppProvider>);await screen.findByText('Saved generation draft');
-    fireEvent.press(screen.getByRole('button',{name:'Discard saved draft'}));const listener=(subscribeGeneration as jest.Mock).mock.calls[0][0];
-    act(()=>listener('Generating local week 1…'));await act(async()=>listener(''));await screen.findByText('PROPOSAL / NOT SAVED');
-    fireEvent.press(screen.getByRole('button',{name:'Confirm discard draft'}));await screen.findByText('Generation draft discarded. You can start a fresh proposal.');
-    expect(screen.queryByText('PROPOSAL / NOT SAVED')).toBeNull();expect(screen.getByRole('button',{name:'Generate initial plan'})).toBeEnabled();expect(saveState).not.toHaveBeenCalled();
+    (loadState as jest.Mock).mockRejectedValue(new Error('Damaged data'));
+    render(<App />);
+    await screen.findByText('Damaged data');
+    expect(saveState).not.toHaveBeenCalled();
   });
   it('saves successful activities even if optional fitness refresh has a warning', async () => {
     const state=emptyState(); (loadState as jest.Mock).mockResolvedValue(state);

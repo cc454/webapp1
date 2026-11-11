@@ -20,7 +20,7 @@ export const workoutSchema = z.object({
   detail: z.string().max(3000), sport: z.enum(['run', 'ride', 'rest']),
   durationSeconds: z.number().int().nonnegative(), distanceKm: z.number().nonnegative(),
   intensity: z.enum(['easy', 'hard', 'rest']), long: z.boolean(),
-  completed: z.boolean(), steps: z.array(stepSchema).max(200),
+  completed: z.boolean(), workoutType: z.string().optional(), completionNote: z.string().optional(), exertion: z.number().int().min(1).max(10).optional(), steps: z.array(stepSchema).max(200),
   templateId: z.string().optional(), parameters: parametersSchema.optional(),
 });
 export const overviewSchema = z.object({
@@ -33,7 +33,7 @@ export const rulesSchema = z.object({
 });
 export const planSchema = z.object({
   version: z.literal(1), revision: z.number().int().min(1), event: eventSchema,
-  start: isoDate, end: isoDate, rules: rulesSchema,
+  title: z.string().optional(), trainingGoal: z.string().optional(), eventGoal: z.string().optional(), start: isoDate, end: isoDate, rules: rulesSchema,
   workouts: z.array(workoutSchema).max(10000), overview: z.array(overviewSchema).min(1).max(1000),
   strategy: z.string().optional(), progressions: z.array(progressionSchema).optional(), constraintDecisions: z.array(z.string()).optional(),
 });

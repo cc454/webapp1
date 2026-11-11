@@ -1,25 +1,23 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { AppState, Plan, GenerationDraft } from './types';
+import { AppState, Plan, Workout, isoDate } from './types';
 import { emptyState } from './defaults';
-import { loadState, saveState, getApiKey, getGarminPassword, saveApiKey, saveGarminPassword, loadGenerationDraft, saveGenerationDraft, clearGenerationDraft } from './storage';
-import { loadBundledMarkdown, pickMarkdownFile, pickTextFile } from './markdown';
-import { parseGoalMarkdown } from './goal';
-import { acceptProposal, upcoming } from './plan';
-import { generatePlan, askCoach, generationSignature } from './llm';
-import { generateLibraryPlan } from './libraryPlanner';
+import { loadState, saveState, getApiKey, getGarminPassword, saveApiKey, saveGarminPassword, clearGenerationDraft } from './storage';
+import { loadBundledMarkdown, pickMarkdownFile } from './markdown';
+import { upcoming } from './plan';
+import { askCoach } from './llm';
 import { parseWorkoutLibrary } from './workoutLibrary';
 import { defaultWorkoutLibrary } from './workoutLibraryDefaults';
-import { matchesGenerationInputs } from './generationInputs';
-import { withGenerationBackground, generationProgress, subscribeGeneration, cancelBackgroundGeneration } from './generationBackground';
 import { appendExchange } from './chat';
 import { disconnect, isConnected, pullActivitySummaries, pullFitness, signIn } from './garmin';
-import { shareBackup, shareExport, shareWorkoutLibrary } from './exports';
-import { decodeBackup } from './backup';
+import { shareBackup, shareExport, shareTextFile, shareWorkoutLibrary } from './exports';
+import { activitySummary, importPlan, trainingPlanTemplate, updateSchedule } from './trainingPlan';
+import { applyTrainingProposal, trainingProposalPrompt } from './trainingProposal';
+
 import { constraintIssues } from './constraints';
 import { today } from './dates';
 
-type Review = { kind: 'proposal' | 'restore'; plan: Plan };
+type Review = { plan: Plan; base: Plan; asOf: string };
 function useController() {
   const [state, setState] = useState<AppState>(emptyState);
   const [ready, setReady] = useState(false);
@@ -29,60 +27,22 @@ function useController() {
   const [notice, setNotice] = useState('');
   const [connected, setConnected] = useState(false);
   const [review, setReview] = useState<Review | null>(null);
-  const [draft, setDraft] = useState<GenerationDraft | null>(null);
-  const [draftError, setDraftError] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const locked = useRef(false);
   const current = useRef(state);
-  const generator = useRef<AbortController | null>(null);
-  const draftEpoch = useRef(0);
   useEffect(() => {
     let mounted = true;
-    let generationSeen = false;
-    const unsubscribe = subscribeGeneration(text => {
-      if (!mounted) return;
-      setBusy(text);
-      if (text) generationSeen = true;
-      else if (generationSeen) {
-        generationSeen = false;
-        const epoch = draftEpoch.current;
-        void loadGenerationDraft().then(saved => {
-          if (!mounted || epoch !== draftEpoch.current) return;
-          setDraft(saved);
-          const value = current.current;
-          if (saved && saved.overview.at(-1)?.end === saved.end && matchesGenerationInputs(saved.signature, generationSignature(value, saved.request, saved.pipeline === 'library'))) {
-            const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: saved.start, end: saved.end, rules: value.settings.rules, workouts: saved.workouts, overview: saved.overview, strategy: saved.outline?.strategy, progressions: saved.outline?.progressions, constraintDecisions: saved.outline?.constraintDecisions }, value.event!, value.settings.rules);
-            setReview({ kind: 'proposal', plan });
-          }
-        }).catch(e => { if (mounted && epoch === draftEpoch.current) { setDraftError(true); setError(e instanceof Error ? e.message : 'Saved generation could not load.'); } });
-      }
+    loadState().then(value => {
+      if (mounted) { current.current = value; setState(value); setReady(true); }
+    }).catch(e => {
+      if (mounted) { setError(e.message); setRecovery(true); setReady(true); }
     });
-    loadState().then(async value => {
-      let savedDraft: GenerationDraft | null = null;
-      try { savedDraft = await loadGenerationDraft(); }
-      catch (e) { if (mounted) { setDraftError(true); setError(e instanceof Error ? e.message : 'Generation draft could not load.'); } }
-      if (mounted) {
-        current.current = value; setState(value); setDraft(savedDraft); setReady(true);
-        if (savedDraft?.overview.at(-1)?.end === savedDraft?.end && savedDraft && matchesGenerationInputs(savedDraft.signature, generationSignature(value, savedDraft.request, savedDraft.pipeline === 'library'))) {
-          try {
-            const plan = acceptProposal(value.plan, { version: 1, revision: (value.plan?.revision ?? 0) + 1, event: value.event!, start: savedDraft.start, end: savedDraft.end, rules: value.settings.rules, workouts: savedDraft.workouts, overview: savedDraft.overview, strategy: savedDraft.outline?.strategy, progressions: savedDraft.outline?.progressions, constraintDecisions: savedDraft.outline?.constraintDecisions }, value.event!, value.settings.rules);
-            setReview({ kind: 'proposal', plan });
-          } catch { setDraftError(true); setError('Saved proposal failed validation. Discard the draft before restarting.'); }
-        }
-      }
-    })
-      .catch(e => { if (mounted) { setError(e.message); setRecovery(true); setReady(true); } });
     isConnected().then(value => { if (mounted) setConnected(value); }).catch(() => {});
-    return () => { mounted = false; unsubscribe(); if (Platform.OS !== 'android') generator.current?.abort(); };
+    return () => { mounted = false; };
   }, []);
   async function commit(value: AppState) {
     await saveState(value);
     current.current = value; setState(value);
-  }
-  async function clearDraft() {
-    // A read started when generation ended must not resurrect a deleted draft.
-    draftEpoch.current++;
-    await clearGenerationDraft(); setDraft(null); setDraftError(false);
   }
   async function run(label: string, action: () => Promise<void>) {
     if (locked.current || !ready) return false;
@@ -91,66 +51,73 @@ function useController() {
     finally { locked.current = false; setBusy(''); }
   }
   const available = ready && !busy && !recovery;
-  const draftMismatch = useMemo(() => !!draft && !matchesGenerationInputs(draft.signature, generationSignature(state, draft.request, draft.pipeline === 'library')), [draft, state]);
-  return { state, ready, recovery, busy, error, notice, connected, review, draft, draftError, draftMismatch, threadId, available,
+  return { state, ready, recovery, busy, error, notice, connected, review, threadId, available,
     setReview, setThreadId,
     saveLibrary: (workoutLibrary: string) => run('Saving workout library…', async () => { parseWorkoutLibrary(workoutLibrary); await commit({ ...current.current, settings: { ...current.current.settings, workoutLibrary } }); setNotice('Workout library saved. Your active plan is unchanged.'); }),
     importLibrary: () => run('Importing workout library…', async () => { const text=await pickMarkdownFile(); if(text===null)return; parseWorkoutLibrary(text); await commit({...current.current,settings:{...current.current.settings,workoutLibrary:text}});setNotice('Workout library imported. Your active plan is unchanged.'); }),
     exportLibrary: () => run('Exporting workout library…', async () => { await shareWorkoutLibrary(current.current.settings.workoutLibrary); }),
     resetLibrary: () => run('Restoring starter library…', async () => { await commit({...current.current,settings:{...current.current.settings,workoutLibrary:defaultWorkoutLibrary}});setNotice('Starter workout library restored. Your active plan is unchanged.'); }),
-    cancelGeneration: () => { generator.current?.abort(); cancelBackgroundGeneration(); },
-    discardDraft: () => run('Discarding generation draft…', async () => { await clearDraft(); setReview(value => value?.kind === 'proposal' ? null : value); setNotice('Generation draft discarded. You can start a fresh proposal.'); }),
-    rejectReview: () => run('Rejecting proposal…', async () => { if (review?.kind === 'proposal') await clearDraft(); setReview(null); }),
-    reset: () => run('Resetting local data…', async () => { await clearDraft(); await commit(emptyState()); setRecovery(false); setReview(null); setThreadId(null); setNotice('Local plan and chat data reset. Credentials are unchanged.'); }),
+    rejectReview: () => { setReview(null); },
+    reset: () => run('Resetting local data…', async () => { await clearGenerationDraft(); await commit(emptyState()); setRecovery(false); setReview(null); setThreadId(null); setNotice('Local plan and chat data reset. Credentials are unchanged.'); }),
     configure: (settings: AppState['settings'], key: string, password: string) => run('Saving settings…', async () => {
       if (key.trim()) await saveApiKey(key); if (Platform.OS !== 'web' && password) await saveGarminPassword(password);
       await commit({ ...current.current, settings }); setNotice('Settings saved. Secret fields have been cleared.');
     }),
     removeKey: () => run('Removing API key…', async () => { await saveApiKey(''); setNotice('OpenRouter key removed.'); }),
-    loadContent: (kind: 'goal' | 'research' | 'constraints', bundled: boolean) => run('Loading file…', async () => {
+    loadContent: (kind: 'research' | 'constraints', bundled: boolean) => run('Loading file…', async () => {
       const text = bundled ? await loadBundledMarkdown(kind) : await pickMarkdownFile();
       if (text === null) return;
       const value = current.current;
-      if (kind === 'goal') {
-        const event = parseGoalMarkdown(text);
-        if (value.plan && JSON.stringify(value.plan.event) !== JSON.stringify(event)) throw new Error('This goal differs from the active plan. Back up your current plan and use Start a new plan before loading a different goal.');
-        await commit({ ...value, event });
-      } else await commit({ ...value, settings: { ...value.settings, [kind]: text } });
+      await commit({ ...value, settings: { ...value.settings, [kind]: text } });
       setNotice(`${kind} loaded.`);
-    }),
-    generate: (request = '') => run('Preparing proposal…', async () => {
-      if (review) throw new Error('Accept or reject the current review first.');
-      if (draftError) throw new Error('Discard the damaged generation draft before restarting.');
-      if (draft && !matchesGenerationInputs(draft.signature, generationSignature(current.current, request, draft.pipeline === 'library'))) throw new Error('The saved draft uses different generation inputs. Discard it before starting a different plan.');
-      draftEpoch.current++;
-      const controller = new AbortController(); generator.current = controller;
-      try {
-        const key = await getApiKey() ?? '';
-        if (!key.trim()) throw new Error('Add your OpenRouter API key in Settings before generating a plan.');
-        const generate = draft && draft.pipeline !== 'library' ? generatePlan : generateLibraryPlan;
-        const plan = await withGenerationBackground(() => generate(current.current, key, request, text => { setBusy(text); generationProgress(text); }, controller.signal, {
-          draft, save: async value => { await saveGenerationDraft(value); setDraft(value); },
-        }), () => controller.abort());
-        // Also checks completed history against the proposal before showing accept.
-        const checked = acceptProposal(current.current.plan, plan, current.current.event!, current.current.settings.rules);
-        setReview({ kind: 'proposal', plan: checked });
-      } finally { generator.current = null; }
     }),
     accept: () => run('Saving reviewed plan…', async () => {
       if (!review) return;
       const value = current.current;
-      if (review.kind === 'proposal') {
-        const issues = constraintIssues(value.settings.constraints, value.settings.rules);
-        if (issues.length && !review.plan.constraintDecisions?.length) throw new Error(issues.join('\n'));
-      }
-      const plan = review.kind === 'restore' ? review.plan : acceptProposal(value.plan, review.plan, value.event!, value.settings.rules);
-      await commit({ ...value, event: plan.event, plan }); await clearDraft(); setReview(null); setNotice('Reviewed plan saved.'); setRecovery(false);
+      if (value.plan !== review.base || today() !== review.asOf) throw new Error('This proposal is stale. Reject it and request a fresh proposal.');
+      await commit({ ...value, plan: review.plan });
+      setReview(null); setNotice('Workout changes saved.');
     }),
-    toggle: (id: string) => run('Saving completion…', async () => {
-      const value = current.current; if (!value.plan || review) return;
+    exportActivities: (kind: 'csv' | 'md') => run('Exporting activities…', async () => {
+      await shareTextFile(`garmin-activities.${kind}`, activitySummary(current.current.activities, kind), kind === 'csv' ? 'text/csv' : 'text/markdown');
+    }),
+    editWorkout: (id: string, fields: Partial<Pick<Workout, 'title' | 'detail' | 'workoutType' | 'durationSeconds' | 'distanceKm'>> & { date: string }, swapId?: string) => run('Saving workout…', async () => {
+      const value = current.current;
+      const plan = value.plan;
+      const original = plan?.workouts.find(w => w.id === id);
+      const now = today();
+      if (!plan || !original || original.completed || original.sport === 'rest' || (original.date < now && (original.completionNote || original.exertion))) throw new Error('Choose an incomplete workout.');
+      const past = original.date < now;
+      if (!isoDate.safeParse(fields.date).success || fields.date < now || (past && fields.date === now)) throw new Error('Choose an eligible date in YYYY-MM-DD format.');
+      const second = swapId ? plan.workouts.find(w => w.id === swapId) : undefined;
+      if (swapId && (!second || second.id === id || second.completed || second.sport === 'rest' || second.date < now || past)) throw new Error('Select a second incomplete upcoming workout.');
+      const updated = past || second
+        ? { ...original, date: second?.date ?? fields.date }
+        : { ...original, ...fields, steps: fields.durationSeconds === original.durationSeconds ? original.steps : [] };
+      if (!updated.title.trim() || !updated.workoutType?.trim() && !past && !second ||
+          !Number.isSafeInteger(updated.durationSeconds) || updated.durationSeconds < 0 ||
+          !Number.isFinite(updated.distanceKm) || updated.distanceKm < 0 ||
+          (!updated.durationSeconds && !updated.distanceKm)) throw new Error('Enter a title, type, and positive duration or distance.');
+      const workouts = plan.workouts.map(w => w.id === id ? updated : second && w.id === second.id ? { ...w, date: original.date } : w);
+      await commit({ ...value, plan: updateSchedule(plan, workouts) });
+    }),
+    toggle: (id: string, completionNote = '', effort = '') => run('Saving completion…', async () => {
+      const value = current.current; if (!value.plan) return;
       const workout = value.plan.workouts.find(w => w.id === id);
       if (!workout || workout.date !== today() || workout.sport === 'rest') throw new Error('Only today’s training can be marked complete or incomplete.');
-      await commit({ ...value, plan: { ...value.plan, workouts: value.plan.workouts.map(w => w.id === id ? { ...w, completed: !w.completed } : w) } });
+      if (!workout.completed && effort && !/^(?:[1-9]|10)$/.test(effort)) throw new Error('Use a whole number from 1 to 10 for perceived exertion.');
+      const completed = !workout.completed;
+      const workouts = value.plan.workouts.map(w => w.id === id ? { ...w, completed, completionNote: completed ? completionNote.trim() || undefined : undefined, exertion: completed && effort ? Number(effort) : undefined } : w);
+      await commit({ ...value, plan: updateSchedule(value.plan, workouts) });
+    }),
+    proposeTraining: (question: string) => run('Preparing workout changes…', async () => {
+      const value = current.current;
+      if (!value.plan) throw new Error('Import a training plan first.');
+      const asOf = today();
+      const reply = await askCoach(trainingProposalPrompt(question, value.plan, asOf), value, await getApiKey() ?? '', value.threads.find(t => t.id === threadId)?.messages);
+      const issues = constraintIssues(value.settings.constraints, value.settings.rules);
+      if (issues.length) throw new Error(issues.join('\n'));
+      setReview({ base: value.plan, asOf, plan: applyTrainingProposal({ ...value.plan, rules: value.settings.rules }, reply, asOf) });
     }),
     chat: (question: string) => run('Asking coach…', async () => {
       if (!question.trim()) return;
@@ -178,14 +145,22 @@ function useController() {
     disconnect: () => run('Disconnecting Garmin…', async () => { await disconnect(); setConnected(false); setNotice('Garmin disconnected. Cached activities retained.'); }),
     exportWeek: (kind: 'md' | 'ics' | 'pdf') => run('Exporting week…', async () => {
       if (!current.current.plan) throw new Error('Accept a plan first.');
-      await shareExport(kind, current.current.plan.event, upcoming(current.current.plan.workouts));
+      await shareExport(kind, current.current.plan.event, upcoming(current.current.plan.workouts), current.current.plan.title);
+    }),
+    downloadTemplate: () => run('Downloading plan template…', async () => {
+      await shareTextFile('training-plan-template.md', trainingPlanTemplate, 'text/markdown');
+    }),
+    importMarkdownPlan: () => run('Importing Markdown plan…', async () => {
+      const text = await pickMarkdownFile();
+      if (text === null) return;
+      const value = current.current;
+      const plan = importPlan(text, value.settings.rules, today());
+      await commit({ ...value, event: null, plan });
+      setRecovery(false);
+      setNotice('Training plan imported.');
     }),
     backup: () => run('Creating backup…', async () => { if (!current.current.plan) throw new Error('Accept a plan first.'); await shareBackup(current.current.plan); }),
-    restore: () => run('Reading backup…', async () => {
-      if (review) throw new Error('Accept or reject the current review first.');
-      const text = await pickTextFile('backup'); if (text !== null) setReview({ kind: 'restore', plan: decodeBackup(text) });
-    }),
-    newPlan: () => run('Starting a new plan…', async () => { await commit({ ...current.current, plan: null }); setReview(null); setNotice('Active plan cleared. Load your next goal and generate a proposal.'); }),
+    newPlan: () => run('Starting a new plan…', async () => { await commit({ ...current.current, plan: null }); setReview(null); setNotice('Active plan cleared. Import your next training plan.'); }),
   };
 }
 const Context = createContext<ReturnType<typeof useController> | null>(null);

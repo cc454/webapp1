@@ -11,22 +11,8 @@ import { loadState, saveState } from '../src/storage';
 import { pickTextFile } from '../src/markdown';
 import { emptyState } from '../src/defaults';
 import { fixturePlan } from './fixtures';
-import { encodeBackup } from '../src/backup';
-describe('AT-11,37: completion and reviewed restore', () => {
+describe('AT-74: completion', () => {
   afterEach(() => jest.useRealTimers());
-  it('restores only on acceptance and retains chats/settings', async () => {
-    const state = emptyState(); state.settings.model = 'my/model'; state.threads = [{ id: 'retained', title: 'My chat', updatedAt: 'now', messages: [] }];
-    (loadState as jest.Mock).mockResolvedValue(state); (saveState as jest.Mock).mockResolvedValue(undefined);
-    (pickTextFile as jest.Mock).mockResolvedValue(encodeBackup(fixturePlan())); render(<App />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Restore a plan backup' })).toBeEnabled());
-    fireEvent.press(screen.getByRole('button', { name: 'Restore a plan backup' })); await screen.findByText('RESTORE PREVIEW'); expect(saveState).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByRole('button', { name: 'Reject' })); expect(saveState).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Restore a plan backup' })).toBeEnabled());
-    fireEvent.press(screen.getByRole('button', { name: 'Restore a plan backup' })); await screen.findByText('RESTORE PREVIEW');
-    fireEvent.press(screen.getByRole('button', { name: 'Accept and save' }));
-    await waitFor(() => expect(saveState).toHaveBeenCalledTimes(1)); const saved = (saveState as jest.Mock).mock.calls[0][0];
-    expect(saved.settings.model).toBe('my/model'); expect(saved.threads).toEqual(state.threads); expect(saved.plan).toEqual(fixturePlan());
-  });
   it('persists completion from the displayed next-seven-day view', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2027-04-05T12:00:00Z'));
     const state = emptyState(); state.plan = fixturePlan(); state.event = state.plan.event;

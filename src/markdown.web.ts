@@ -1,8 +1,8 @@
 import { Asset } from 'expo-asset';
 const bundled = { goal: require('../training/goal.md'), research: require('../training/research.md'), constraints: require('../training/constraints.md') };
-export async function pickTextFile(kind: 'guidance' | 'backup' = 'guidance'): Promise<string | null> {
+export async function pickTextFile(): Promise<string | null> {
   return new Promise((resolve, reject) => {
-    const input = document.createElement('input'); input.type = 'file'; input.accept = kind === 'backup' ? '.json' : '.md,.txt';
+    const input = document.createElement('input'); input.type = 'file'; input.accept = '.md,.txt';
     input.oncancel = () => resolve(null);
     input.onchange = async () => {
       const file = input.files?.[0];

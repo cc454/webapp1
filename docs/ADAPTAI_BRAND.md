@@ -4,7 +4,7 @@ Rebrand this personal endurance training app as **Adaptai**. The tone is calm, p
 
 ## Architecture and integration
 
-This is an Expo / React Native app with Expo Router tabs. `src/ui.tsx` owns shared colors and styles. `src/screens.tsx` exports `Page`, used by Plan, Chat, Settings and Workout Library. `src/BrandHeader.tsx` renders the shared brand header. Keep page titles and navigation; omit per-tab marketing subtitles. `Page` deliberately has no subtitle property. `app.json` owns the app display name.
+This is an Expo / React Native app with Expo Router tabs. `src/ui.tsx` owns shared colors and styles. `src/screens.tsx` exports `Page`, used by Plan, Chat and Settings. `src/BrandHeader.tsx` renders the shared brand header. Keep page titles and navigation; omit per-tab marketing subtitles. `Page` deliberately has no subtitle property. `app.json` owns the app display name.
 
 ## Palette
 
@@ -26,7 +26,7 @@ Keep the shared header in one horizontal row: 26px-high symbol, 22px wordmark, t
 
 ## Screen-space hierarchy
 
-Below the brand row show one page/tab heading at 26px with a 32px line height and 12px separation. Do not restore the removed Plan, Chat, Settings or Workout Library subtitles, and do not leave an empty subtitle row. Prioritize the plan, coach messages and actionable settings over repeated introductory copy. Preserve meaningful guidance, status/error messages and review disclosures.
+Below the brand row show one page/tab heading at 26px with a 32px line height and 12px separation. Do not restore the removed Plan, Chat or Settings subtitles, and do not leave an empty subtitle row. Prioritize the plan, coach messages and actionable settings over repeated introductory copy. Preserve meaningful guidance, status/error messages and review disclosures.
 
 Save space in the shared header rather than squeezing working content: retain 22px page padding, 18px content gaps, 20px card padding, existing body typography and comfortable touch targets. Validate the complete inline descriptor at 320px and 360px widths and desktop width. Also check large text on Android: essential content must remain readable and scrollable, and the compact branding must not overlap the page heading or controls.
 

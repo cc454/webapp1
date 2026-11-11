@@ -1,18 +1,16 @@
 # Adaptai
 
-A local-first personal trainer for running and cycling, built with Expo, React Native, and TypeScript. Plans run from creation through your event date. Initial plans and revisions remain proposals until you review and accept them.
+A local-first personal trainer for running and cycling, built with Expo, React Native and TypeScript. Version 0.2.1 uses one externally authored training plan and offers Plan, Chat and Settings.
 
-## Implementation status
+## First use
 
-Version 0.1.9 saves screen space with a single-row brand header, smaller page headings and no per-tab subtitles. Working content retains its spacing and readable controls. Version 0.1.8 added the Adaptai launcher icon, including adaptive/themed variants. See [design guidelines](docs/ADAPTAI_BRAND.md) for the shared layout rules.
+1. In Plan, select **Download Markdown template**. Author your plan using the headings shown in the file, then select **Import Markdown plan**. Use a plan title and a training goal, an event goal, or both. Place each workout under its YYYY-MM-DD date, using a sport and type heading, a title, and a duration in seconds, minutes or hours, a distance in kilometres, or both.
+2. Use Plan to see today and the next six days. Use **Show past workouts and activities** below the entire plan summary to see past planned workouts and synced Garmin activities from the plan period. Edit or swap incomplete upcoming workouts in the schedule. An unstarted past workout can be moved to a future date. Mark today's workout complete even if you only did part of it. Completion notes and exertion from 1 to 10 are optional.
+3. In Settings, configure your OpenRouter key and model. Ask for advice in Chat or use **Propose plan changes**, then review the changes in Plan. Each proposal covers up to seven consecutive calendar days. A changed active plan requires a fresh proposal.
+4. Save Garmin credentials in Settings and connect on Android. Use **Sync activities** in either Plan or Settings. Settings exports cached running and cycling activity summaries in CSV and Markdown.
+5. Export full plan Markdown to carry your schedule and completion history to a new installation. Import replaces the active plan with the schedule and history in the file. The seven-day exports are schedule views.
 
-Launcher assets are committed in `assets/brand/` and configured in `app.json`. To rebuild them after editing the polygon-based `adaptai-mark.svg`, run `python scripts/generate-launcher-icons.py` with Pillow installed. Expo prebuild generates all Android launcher densities and round/adaptive resources; changing only the JavaScript bundle does not update the installed launcher icon.
-
-The app now includes Plan, Chat, Workout Library, and Settings; goal/guidance imports; rolling seven-day views; plan validation and review; OpenRouter coaching; ten conversation threads; SQLite persistence on Android; exports; and versioned plan backup/restore. A browser preview uses local browser storage and memory-only API keys.
-
-The owner confirms the recent changes work on the phone. Version 0.1.6 adds completion controls only for today's running/cycling training, English weekday labels and a collapsible entire-plan summary at the bottom of Plan. Chat aligns the latest coach reply at its top, including short replies and keyboard resizing. Settings offers Claude Sonnet 4.6, Claude Haiku 4.5 and Gemini 2.5 Flash in a dropdown; the model identifier remains editable and selection is applied with Save settings. The workout library, two-stage planning and reviewed proposals remain available. See [verification status](TESTING.md).
-
-Garmin sign-in and activity sync are confirmed working on the owner's phone. The native adapter fetches the last 50 activities and retains supported running/cycling summaries, including optional HR, speed, elevation, power, and cadence. Sync also fetches running/cycling VO₂ max, cycling FTP/kg and FTP, and configured heart-rate zones, displaying units and fetch timestamps in Settings and including them in coach context. Failed optional metric endpoints retain cached values with warnings; missing values remain unavailable. Lap detail, load, and recovery endpoints are pending. Garmin workout push is deferred. Native iOS and Ona are out of scope.
+Plan, guidance, activities and chats are stored on the device. Coaching sends selected context through OpenRouter to the selected model provider. Plan and activity exports exclude credentials and chats. Android secrets use SecureStore. The browser keeps its API key in memory and has no Garmin connection or cross-device sync.
 
 ## Development
 
@@ -48,68 +46,4 @@ The bootstrap script downloads the JDK and Google command-line tools into ignore
 The pnpm 11 dependency layout is configured in `pnpm-workspace.yaml` ([pnpm migration guide](https://pnpm.io/docs/migration)). On Windows, the build script temporarily maps an unused drive letter to an SDK path containing spaces, avoiding CMake's incorrect short-name treatment of `clang++.exe`. It also maps the Gradle cache to an unused drive letter and places native caches under the short SDK path and removes only its own mapping afterward. Phone builds include ARM64 and ARMv7. Pass `-Architectures "arm64-v8a,armeabi-v7a,x86,x86_64"` for emulator binaries. To retry Gradle without regenerating the native project, pass `-SkipPrebuild` to `scripts/build-android.ps1`.
 
 The generated release variant uses the template debug certificate for personal testing only. Keep the same signing identity when upgrading; do not uninstall first if you want to preserve data. Production distribution needs a private release keystore. APK installation/upgrade on the owner's phone remains a separate acceptance check.
-
-## First use
-
-1. In Settings, load the project goal, research, and constraints, or import your own .md/.txt files.
-2. Configure an OpenRouter model and API key, then save settings. Native keys are stored in SecureStore. The default model is anthropic/claude-sonnet-4.6; generation uses structured output when supported and otherwise requests JSON with the same local validation.
-3. Save Garmin email/password, connect, and sync activities on Android. An error leaves the cache intact; a session error requires reauthentication.
-4. In Workout Library, inspect the starter templates or import your edited .md file. Generate from Plan: the LLM first chooses the overall progression and reusable calendar patterns, then parameterizes each unique workout variant once. The app expands the selected blocks into dated sessions, derives totals and checks calendar rules. Progress, cancellation, saved-stage resume and SSE response recovery are supported. Review strategy, phase progression, constraint decisions and every proposed session before accepting; no partial plan is activated.
-5. Use Chat for advice. To change the plan, enter a request and select Propose plan changes, then review it on Plan.
-6. Back up the current plan before clearing it or changing events. Restore previews a JSON backup before replacing the active plan.
-
-Ten chats means ten conversation threads ordered by recent use. The oldest is removed when a new thread would exceed ten. Workout completion is manual.
-
-The native Garmin adapter uses the [maintained client's mobile service-ticket/token flow](https://github.com/cyberjunky/python-garminconnect/blob/master/garminconnect/client.py) and `connectapi.garmin.com` bearer authentication. It verifies profile access before saving tokens in SecureStore and refreshes an expired access token once. Fitness endpoint mappings follow the [Garmin client implementation](https://github.com/cyberjunky/ha-garmin/blob/main/src/ha_garmin/client.py). Plan response handling follows [OpenRouter streaming](https://openrouter.ai/docs/api_reference/streaming) and [response error handling](https://openrouter.ai/docs/api_reference/errors-and-debugging).
-
-Chat keeps its composer below the scrolling messages and resizes around the Android keyboard. A successful, saved response clears the submitted draft; failures retain it. Multiline fields have a bounded height and an internal scroll indicator. Operations automatically reveal progress/errors at the top of the page. Plan generation retries a weekly response up to twice for validation repairs and supports a locally validated JSON prompt fallback when a provider cannot accept structured output.
-
-Android generation uses a foreground data-transfer service and wake lock, with a progress notification. Allow notifications when prompted. Switching apps or turning the screen off should keep generation running; force-stop, reboot, Android service time limits, or manufacturer restrictions can interrupt it. Reopen Plan and resume the saved draft afterward. Completed proposals survive restart and still require review. Cancel retains saved planning stages/weeks; rejecting a proposal or confirming Discard draft removes them. Changed event/model/rules/guidance/library/baseline inputs require discarding the previous draft before restarting. Browser generation does not have Android background guarantees. Unsaved runs from older versions cannot be recovered; persisted 0.1.3 weekly drafts can finish through their original weekly engine.
-
-If a saved draft blocks fresh generation, select **Discard saved draft**, then **Confirm discard draft** in the visible dialog. The draft is removed only after confirmation succeeds; **Keep saved draft** cancels. A deletion error keeps the dialog open for retry. Once the success notice appears, Generate initial plan is enabled if a goal is loaded and no review/operation is pending. Incompatible drafts explain why Resume is disabled. Harmless JSON field-order changes after storage/restart do not invalidate legacy or new drafts; actual input changes still do.
-
-## Workout Library and planning
-
-The starter [workouts.md](training/workouts.md) contains ENDURANCE, LONG_ENDURANCE, TEMPO, THRESHOLD, VO2_LONG, VO2_SHORT, SPRINT, ANAEROBIC, PROGRESSIVE and RECOVERY. Each shares a stimulus but defines separate running/cycling parameters, duration/repetition/set bounds, intensity guidance and progression advice. Cycling may use FTP percentages; missing FTP does not invent watts. Rest and the half-marathon event are calendar entries outside the ten primitives.
-
-Export the saved library from its tab, edit the single fenced JSON block in the .md file, and import it. You can also edit its bounded Markdown field and save. Ranges mean `[minimum, default, maximum]`; time values are seconds. Defaults must also satisfy coupled total-work/recovery-ratio constraints. Invalid/cancelled imports retain the saved library. Restoring the starter requires confirmation. Library edits never modify an active plan, and legacy installations receive the starter without losing their other data. Prose outside the JSON block documents the format; template `goal`, `progression` and `targetCue` fields carry guidance to the planner.
-
-The first LLM stage defines strategy, progression objects, unique variant prescriptions, reusable day patterns, weekly phases/focus and decisions about conflicting guidance. The second stage chooses each variant's actual parameters once, using a compact ten-value response array. The app computes ordered warmup/work/recovery/cooldown steps, unique dated IDs, completion state and overview volume. Recovery appears between repetitions/sets, never after the final repetition. A typical repeat-heavy plan uses two provider requests rather than one per week; bounded repairs/transport retries can add requests. Scheduling violations go back to the LLM; the app does not invent progression, deloads, tapering or move sessions silently. Enforced rules remain mandatory, and ambiguous guidance decisions are shown for review. Past/completed workouts remain unchanged during revisions.
-
-Both LLM stages are checkpointed, followed by locally assembled weekly checkpoints. A restart can reuse the outline, blocks or complete proposal without paying to regenerate them. The intended plan quality and appropriate training distribution remain LLM decisions reviewed by the athlete; the default library does not impose 80/20 or claim exact parameter ranges are universally established by research.
-
-## Generation cost
-
-The selected model remains unchanged. New generation sends compact activity/calendar context, creates an overall progression once, parameterizes each distinct workout once, and duplicates repeated instances locally. It calculates step totals and overview volumes locally and retains both stages/weeks after interruptions. The old weekly engine is used only to finish existing 0.1.3 drafts. Monday and other scheduling rules still apply to derived totals. Actual cost savings require a live billing comparison.
-
-Current standard prices per million input/output tokens, checked 7 October 2026:
-
-| Model | Input | Output |
-| --- | ---: | ---: |
-| [Claude Sonnet 4.6](https://openrouter.ai/anthropic/claude-sonnet-4.6) | $3 | $15 |
-| [Claude Haiku 4.5](https://openrouter.ai/anthropic/claude-haiku-4.5) | $1 | $5 |
-| [Gemini 2.5 Flash](https://openrouter.ai/google/gemini-2.5-flash) | $0.30 | $2.50 |
-
-Choose a cheaper model in Settings and check its plan quality before relying on it. Haiku is one-third of Sonnet's standard token prices; total cost also depends on output length and retries. Shorter research text reduces input costs. Compact block output and fewer requests are now implemented. Explicit [prompt caching](https://openrouter.ai/docs/guides/best-practices/prompt-caching) remains a future option: it requires a stable supported prefix, charges for cache writes and does not reduce output charges; the outline and parameter stages use different schemas.
-
-## Goal and scheduling rules
-
-The bundled [goal.md](training/goal.md) specifies Halbmarathon on 11 April 2027. Required fields are name, date, distance in km, target time as H:MM (optional seconds), and elevation in m. Pace is calculated: 21.1 km in 2:00 is approximately 5:41/km; legacy pace text is ignored.
-
-The enforced scheduling controls are minimum rest days, Monday maximum duration, weekend long sessions, and no consecutive hard days. Rest quotas apply to full seven-day blocks anchored at plan creation; the final partial block has no prorated quota. Daily rules still apply.
-
-The four bundled constraints are recognized and checked against those controls. Unrecognized scheduling prose blocks generation until resolved. Prefix advisory text with `guidance:` if it is meant for the coach rather than deterministic enforcement. Changing rules does not silently revise the active plan.
-
-## Privacy and portability
-
-Plan, guidance, activities, and chats stay on the device. Coaching sends selected context through OpenRouter to the selected downstream provider. Garmin credentials are excluded from coaching, logs, and backups. Plan backups include event, dates, overview, sessions, and completion; they exclude credentials and chat history. Restore preserves current device settings and chats.
-
-Browser storage is local to that browser; there is no cross-device sync. Browser API keys are held in memory and must be re-entered after reload. Garmin is Android-only. The browser PDF export opens the print/save-as-PDF dialog.
-
-## References
-
-- [Requirements and acceptance cases](REQUIREMENTS.md)
-- [Development plan](DEVELOPMENT_PLAN.md)
-- [Verification evidence and remaining device checks](TESTING.md)
-
-Brand assets live in `assets/brand`; `src/BrandHeader.tsx` renders the shared page header. See `docs/ADAPTAI_BRAND.md` for brand and compatibility guidance.
+See [requirements](REQUIREMENTS.md), [user stories](USER_STORIES.md), [acceptance matrix](ACCEPTANCE.md), and [verification notes](TESTING.md).

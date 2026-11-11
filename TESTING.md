@@ -183,3 +183,14 @@ Each AT ID below corresponds to the same-numbered requirement in REQUIREMENTS.md
 9. In Workout Library export the starter .md, edit a template, import it and restart. Verify saved changes, valid rejection/cancellation and that the active plan is untouched. Generate with the new pipeline, inspect strategy/phase progression and all sessions before acceptance, and record actual token costs and model quality.
 
 Do not record keys, passwords, session cookies, or private raw account data in test evidence committed to Git.
+
+See [imported-plan acceptance matrix](ACCEPTANCE.md) for the next release. Results above apply to the prior version.
+
+## Adaptai 0.2.0
+
+Strict TypeScript, the web export and all 143 automated tests in 23 suites passed. The [acceptance matrix](ACCEPTANCE.md) maps the active requirements and stories to acceptance cases and records device checks still pending. The automated tests use fixtures for Garmin and OpenRouter.
+The Android release build succeeded. APK metadata confirms Adaptai 0.2.0 (version code 11), package com.cc454.strideai and ARM64/ARMv7. APK Signature Scheme v2 verification passed with the testing-only Android Debug certificate. Physical installation, data-preserving upgrade and live Garmin/OpenRouter checks are pending.
+
+## Adaptai 0.2.1
+
+Strict TypeScript and all 138 automated tests in 22 suites passed. Plan history starts collapsed below the entire plan summary. The Plan UI test verifies that opening it reveals past planned workouts and cached Garmin activities, and that a missed workout can still be rescheduled. Full-plan import and export use Markdown.

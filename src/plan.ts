@@ -40,6 +40,16 @@ export function validatePlan(plan: Plan): string[] {
 }
 export function checkedPlan(value: unknown): Plan {
   const plan = planSchema.parse(value);
+  if (plan.title) {
+    if (!plan.title.trim() || (!plan.trainingGoal?.trim() && !plan.eventGoal?.trim())) throw new Error('The plan needs a title and a goal.');
+    const ids = new Set(plan.workouts.map(workout => workout.id));
+    if (ids.size !== plan.workouts.length || plan.start > plan.end ||
+        plan.workouts.some(workout => workout.date < plan.start || workout.date > plan.end ||
+          (workout.sport !== 'rest' && !workout.durationSeconds && !workout.distanceKm))) {
+      throw new Error('The saved schedule contains an invalid workout.');
+    }
+    return plan;
+  }
   const errors = validatePlan(plan);
   if (errors.length) throw new Error(errors.slice(0, 12).join('\n'));
   return plan;
