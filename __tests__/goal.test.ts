@@ -4,7 +4,7 @@ const goal = 'name: Halbmarathon\ndate: April 11, 2027\ndistance: 21.1 km\ntarge
 describe('AT-03–06: event inputs', () => {
   it('uses the actual goal and calculates pace instead of trusting legacy text', () => {
     const event = parseGoalMarkdown(goal, '2026-10-07');
-    expect(event.date).toBe('2027-04-11'); expect(pace(event.targetSeconds, event.distanceKm)).toBe('5:41 / km');
+    expect(event.date).toBe('2027-04-11'); expect(pace(event.targetSeconds, event.distanceKm)).toBe('05:41 / km');
   });
   it('supports aliases, ISO dates, seconds, and comma-separated metric elevation', () => {
     const result = parseGoalMarkdown('event name: Race\ntarget date: 2027-04-11\ndistance: 10 km\ntime: 1:00:30\ngain: 1,000 m', '2026-10-07');

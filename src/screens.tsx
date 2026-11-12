@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState as NativeAppState, KeyboardAvoidingView, Modal, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { useApp } from './appContext';
 import { Button, Card, colors, Field, s } from './ui';
-import { addDays, displayDate, duration, pace, today } from './dates';
+import { addDays, displayDate, duration, minutesSeconds, parseDuration, today, workoutMetrics } from './dates';
+import { displayEventGoal, displayPrescription } from './trainingPlan';
 import { planDiff, upcoming } from './plan';
 import { isTruncated } from './llm';
 import { rulesSchema } from './types';
@@ -38,7 +39,7 @@ function Review() {
     <Text style={s.muted}>Rest quota: {plan.rules.restDays} per complete creation-anchored seven-day block. Final partial blocks have no rest quota. Daily rules still apply.</Text>
     {!!plan.strategy && <><Button title={phases ? 'Hide proposed phase progression' : 'Review proposed phase progression'} secondary onPress={()=>setPhases(!phases)} />{phases&&plan.overview.map(w=><View key={w.start} style={{gap:4}}><Text style={s.body}>{w.start} → {w.end} · {w.phase}</Text><Text style={s.muted}>{w.focus} · {w.runningKm} km running · {w.cyclingKm} km cycling</Text></View>)}</>}
     <Button title={expanded ? 'Hide proposed sessions' : 'Review every proposed session'} secondary onPress={() => setExpanded(!expanded)} />
-    {expanded && plan.workouts.map(w => <View key={w.id} style={{ borderTopWidth: 1, borderColor: colors.edge, paddingTop: 12, gap: 5 }}><Text style={s.body}>{w.date} · {w.title}</Text><Text style={s.muted}>{w.sport} · {duration(w.durationSeconds)} · {w.distanceKm} km · {w.intensity}</Text><Text style={s.muted}>{w.detail}</Text>{w.steps.map((step, i) => <Text key={i} style={s.muted}>{step.repeats} × {duration(step.seconds)} {step.kind} · {step.target}</Text>)}</View>)}
+    {expanded && plan.workouts.map(w => <View key={w.id} style={{ borderTopWidth: 1, borderColor: colors.edge, paddingTop: 12, gap: 5 }}><Text style={s.body}>{w.date} · {w.title}</Text><Text style={s.muted}>{[w.sport, workoutMetrics(w), w.intensity].filter(Boolean).join(' · ')}</Text><Text style={s.muted}>{displayPrescription(w.detail)}</Text>{w.steps.map((step, i) => <Text key={i} style={s.muted}>{step.repeats} × {minutesSeconds(step.seconds)} {step.kind} · {step.target}</Text>)}</View>)}
     <Text style={s.muted}>Acceptance saves this validated proposal. Completed workouts remain preserved.</Text>
     <View style={s.row}><Button title="Accept and save" onPress={app.accept} disabled={!!app.busy || (app.review.base !== app.state.plan)} /><Button title="Reject" secondary onPress={app.rejectReview} disabled={!!app.busy} /></View>
   </Card>;
@@ -55,23 +56,24 @@ function WorkoutCard({ workout, date, swap, selectSwap }: {
   const [type, setType] = useState('');
   const [detail, setDetail] = useState('');
   const [target, setTarget] = useState('');
-  const [seconds, setSeconds] = useState('');
+  const [time, setTime] = useState('');
   const [km, setKm] = useState('');
   const [note, setNote] = useState('');
   const [effort, setEffort] = useState('');
   const past = workout.date < date;
   const canEdit = !workout.completed && workout.sport !== 'rest';
+  const displayedTime = workout.durationSeconds ? duration(workout.durationSeconds) : '';
   function openEditor() {
     setTitle(workout.title); setType(workout.workoutType ?? (workout.intensity === 'hard' ? 'Hard' : 'Easy'));
     setDetail(workout.detail); setTarget(workout.date);
-    setSeconds(String(workout.durationSeconds || '')); setKm(String(workout.distanceKm || '')); setEdit(true);
+    setTime(displayedTime); setKm(String(workout.distanceKm || '')); setEdit(true);
   }
   return <Card>
     <Text style={past ? s.muted : s.eyebrow}>{workout.sport === 'ride' ? 'Ride' : 'Run'} · {workout.workoutType ?? (workout.intensity === 'hard' ? 'Hard' : 'Easy')}</Text>
     <Text style={past ? s.muted : s.heading}>{workout.title}</Text>
-    {workout.steps.map((step, index) => <Text key={index} style={s.muted}>{step.repeats} × {step.seconds} s {step.kind} · {step.target}</Text>)}
-    {!!workout.detail && <Text style={past ? s.muted : s.body}>{workout.detail}</Text>}
-    <Text style={s.muted}>{[workout.durationSeconds ? `${workout.durationSeconds} s` : '', workout.distanceKm ? `${workout.distanceKm} km` : ''].filter(Boolean).join(' · ')}</Text>
+    {workout.steps.map((step, index) => <Text key={index} style={s.muted}>{step.repeats} × {minutesSeconds(step.seconds)} {step.kind} · {step.target}</Text>)}
+    {!!workout.detail && <Text style={past ? s.muted : s.body}>{displayPrescription(workout.detail)}</Text>}
+    <Text style={s.muted}>{workoutMetrics(workout)}</Text>
     <Text style={s.body}>{workout.completed ? 'Complete' : 'Incomplete'}</Text>
     {!!workout.completionNote && <Text style={s.body}>{workout.completionNote}</Text>}
     {!!workout.exertion && <Text style={s.body}>Perceived exertion {workout.exertion}/10</Text>}
@@ -92,12 +94,13 @@ function WorkoutCard({ workout, date, swap, selectSwap }: {
         <Field label="Workout title" value={title} onChangeText={setTitle} />
         <Field label="Workout type" value={type} onChangeText={setType} />
         <Field label="Prescription" multiline value={detail} onChangeText={setDetail} />
-        <Field label="Duration in seconds" value={seconds} onChangeText={setSeconds} keyboardType="number-pad" />
+        <Field label="Duration (H:MM)" value={time} onChangeText={setTime} placeholder="0:45" />
         <Field label="Distance in km" value={km} onChangeText={setKm} keyboardType="decimal-pad" />
       </>}
       <Field label="Date (YYYY-MM-DD)" value={target} onChangeText={setTarget} />
       <Button title="Save workout" disabled={!app.available} onPress={async () => {
-        if (await app.editWorkout(workout.id, { date: target, title, workoutType: type, detail, durationSeconds: Number(seconds), distanceKm: Number(km) })) setEdit(false);
+        const durationSeconds = time.trim() === displayedTime ? workout.durationSeconds : time.trim() ? parseDuration(time) : 0;
+        if (await app.editWorkout(workout.id, { date: target, title, workoutType: type, detail, durationSeconds, distanceKm: Number(km) })) setEdit(false);
       }} />
       {!past && <Button title="Select workout to swap" onPress={() => { setEdit(false); selectSwap(workout.id); }} />}
       <Button title="Cancel edit" secondary onPress={() => setEdit(false)} />
@@ -130,7 +133,7 @@ export function PlanScreen() {
     <Card>
       {state.plan && <><Text style={s.heading}>{state.plan.title ?? state.plan.event.name}</Text>
         {!!state.plan.trainingGoal && <Text style={s.body}>{state.plan.trainingGoal}</Text>}
-        {!!state.plan.eventGoal && <Text style={s.body}>{state.plan.eventGoal}</Text>}</>}
+        {!!state.plan.eventGoal && <Text style={s.body}>{displayEventGoal(state.plan.eventGoal)}</Text>}</>}
       <Button title="Download Markdown template" onPress={app.downloadTemplate} disabled={!app.ready || !!app.busy} />
       <Button title="Import Markdown plan" onPress={app.importMarkdownPlan} disabled={!app.ready || !!app.busy} />
       <Button title="Sync activities" onPress={app.sync} disabled={!app.available} />
@@ -171,7 +174,7 @@ export function PlanScreen() {
         {pastActivities.map(({ activity, day }) => <Card key={activity.id}>
           <Text style={s.muted}>{displayDate(day)} · {activity.sport === 'ride' ? 'Ride' : 'Run'}</Text>
           <Text style={s.body}>{activity.name}</Text>
-          <Text style={s.muted}>{duration(activity.durationSeconds)} · {activity.distanceKm} km{activity.averageHeartRate === undefined ? '' : ` · ${activity.averageHeartRate} bpm`}</Text>
+          <Text style={s.muted}>{[workoutMetrics(activity), activity.averageHeartRate !== undefined && `${activity.averageHeartRate} bpm`].filter(Boolean).join(' · ')}</Text>
         </Card>)}
       </>}
     </>}

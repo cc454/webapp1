@@ -48,7 +48,7 @@ describe('AT-14,32,38: rendered app flows', () => {
     const text = trainingPlanTemplate.replace('2027-03-01', today());
     state.plan = importPlan(text, state.settings.rules, today());
     (loadState as jest.Mock).mockResolvedValue(state);
-    (pickMarkdownFile as jest.Mock).mockResolvedValue(text.replace('30 min', '30 min\n- Completed: yes\n- Completion note: Half done\n- Exertion: 5'));
+    (pickMarkdownFile as jest.Mock).mockResolvedValue(text.replace('Elevation: 25 m', 'Elevation: 25 m\n- Completed: yes\n- Completion note: Half done\n- Exertion: 5'));
     render(<App />);
     const button = await screen.findByRole('button', { name: 'Import Markdown plan' });
     await waitFor(() => expect(button).toBeEnabled());
@@ -97,7 +97,7 @@ describe('AT-14,32,38: rendered app flows', () => {
       `\n### ${first}\n#### Ride · Easy\n- Title: Recovery ride\n- Distance: 15 km\n`;
     state.plan = importPlan(text, state.settings.rules, first);
     (loadState as jest.Mock).mockResolvedValue(state);
-    state.activities = [{ id: 1, name: 'Synced morning run', sport: 'run', startedAt: `${missed}T12:00:00`, durationSeconds: 1800, distanceKm: 5 }];
+    state.activities = [{ id: 1, name: 'Synced morning run', sport: 'run', startedAt: `${missed}T12:00:00`, durationSeconds: 1800.5, distanceKm: 5, elevationM: 80 }];
     render(<App />);
     await screen.findByText('Entire plan summary');
     expect(screen.queryByText('Aerobic run')).toBeNull();
@@ -105,6 +105,8 @@ describe('AT-14,32,38: rendered app flows', () => {
     expect(screen.queryByRole('button', { name: /restore.*backup/i })).toBeNull();
     fireEvent.press(await screen.findByRole('button', { name: 'Show past workouts and activities' }));
     expect(screen.getByText('Synced morning run')).toBeTruthy();
+    expect(screen.getByText('0:30 · 5 km · 06:00 / km · 80 m')).toBeTruthy();
+    expect(screen.getByText('0:30 · 5 km · 06:00 / km · 25 m')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Hide past workouts and activities' }));
     expect(screen.queryByText('Synced morning run')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Show past workouts and activities' }));
@@ -121,6 +123,20 @@ describe('AT-14,32,38: rendered app flows', () => {
     await waitFor(() => expect(saveState).toHaveBeenCalledTimes(2));
     expect((saveState as jest.Mock).mock.calls[1][0].plan.workouts.map((w: { title: string; date: string }) => [w.title, w.date]))
       .toEqual([['Aerobic run', first], ['Recovery ride', second]]);
+  });
+  it('edits a workout in H:MM and preserves exact seconds when its duration is left alone', async () => {
+    const state = emptyState();
+    state.plan = importPlan(trainingPlanTemplate.replace('2027-03-01', today()).replace('Duration: 0:30', 'Duration: 0:30:15'), state.settings.rules, today());
+    (loadState as jest.Mock).mockResolvedValue(state);
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'Edit workout' }));
+    expect(screen.getByLabelText('Duration (H:MM)').props.value).toBe('0:30');
+    fireEvent.press(screen.getByRole('button', { name: 'Save workout' }));
+    await waitFor(() => expect((saveState as jest.Mock).mock.calls.at(-1)?.[0].plan.workouts[0].durationSeconds).toBe(1815));
+    fireEvent.press(await screen.findByRole('button', { name: 'Edit workout' }));
+    fireEvent.changeText(screen.getByLabelText('Duration (H:MM)'), '1:05');
+    fireEvent.press(screen.getByRole('button', { name: 'Save workout' }));
+    await waitFor(() => expect((saveState as jest.Mock).mock.calls.at(-1)?.[0].plan.workouts[0].durationSeconds).toBe(3900));
   });
   it('shows recovery without overwriting corrupt state', async () => {
     (loadState as jest.Mock).mockRejectedValue(new Error('Damaged data'));

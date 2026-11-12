@@ -19,6 +19,7 @@ export const workoutSchema = z.object({
   id: z.string().min(1), date: isoDate, title: z.string().min(1).max(200),
   detail: z.string().max(3000), sport: z.enum(['run', 'ride', 'rest']),
   durationSeconds: z.number().int().nonnegative(), distanceKm: z.number().nonnegative(),
+  elevationM: z.number().nonnegative().optional(), paceSecondsPerKm: z.number().int().positive().optional(),
   intensity: z.enum(['easy', 'hard', 'rest']), long: z.boolean(),
   completed: z.boolean(), workoutType: z.string().optional(), completionNote: z.string().optional(), exertion: z.number().int().min(1).max(10).optional(), steps: z.array(stepSchema).max(200),
   templateId: z.string().optional(), parameters: parametersSchema.optional(),

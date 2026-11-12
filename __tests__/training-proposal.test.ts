@@ -2,7 +2,7 @@ import { importPlan, trainingPlanTemplate } from '../src/trainingPlan';
 import { applyTrainingProposal } from '../src/trainingProposal';
 
 const rules = { restDays: 0, mondayMaxMinutes: 120, noConsecutiveHard: false, weekendLong: false };
-const original = importPlan(trainingPlanTemplate.replace('30 min', '30 min\n- Completed: yes\n- Exertion: 7'), rules, '2027-03-01');
+const original = importPlan(trainingPlanTemplate.replace('Elevation: 25 m', 'Elevation: 25 m\n- Completed: yes\n- Exertion: 7'), rules, '2027-03-01');
 
 test('copies a completed past example with blank completion history', () => {
   const copy = { action: 'copy', id: original.workouts[0]!.id, date: '2027-03-08' };

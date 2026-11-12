@@ -1,4 +1,4 @@
-import { today as localToday, uid } from './dates';
+import { duration, minutesSeconds, pace, parseDuration, today as localToday, uid } from './dates';
 import { planSchema, isoDate } from './types';
 
 export type TrainingWorkout = {
@@ -9,6 +9,8 @@ export type TrainingWorkout = {
   description: string;
   durationSeconds?: number;
   distanceKm?: number;
+  elevationM?: number;
+  paceSecondsPerKm?: number;
   completed: boolean;
   completionNote?: string;
   exertion?: number;
@@ -30,11 +32,29 @@ Build aerobic endurance.
 ### 2027-03-01
 #### Run · Easy
 - Title: Aerobic run
-- Duration: 30 min
+- Duration: 0:30
 - Distance: 5 km
+- Pace: 06:00 / km
+- Elevation: 25 m
 
 Keep the effort conversational.
 `;
+
+export function displayPrescription(detail: string) {
+  return detail.replace(/^(\s*- \d+ × )(\d+(?:[.,]\d+)?\s*(?:s|min|h))(?= (?:warmup|work|recovery|cooldown)\b)/gm,
+    (line, prefix: string, value: string) => {
+      const seconds = parseDuration(value);
+      return Number.isFinite(seconds) ? prefix + minutesSeconds(seconds) : line;
+    });
+}
+
+export function displayEventGoal(goal: string) {
+  return goal.replace(/( · Target )(\d+(?:[.,]\d+)?\s*(?:s|min|h))(?=\s*$)/m,
+    (line, prefix: string, value: string) => {
+      const seconds = parseDuration(value);
+      return Number.isFinite(seconds) ? prefix + duration(seconds) : line;
+    });
+}
 
 export function parseTrainingPlan(input: string): TrainingPlan {
   const lines = input.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
@@ -76,7 +96,7 @@ export function parseTrainingPlan(input: string): TrainingPlan {
     if (!date || !heading) throw new Error('Place each workout under a date with a heading such as #### Run · Easy.');
     const fields = new Map<string, string>();
     while (index < lines.length) {
-      const field = /^- (Title|Duration|Distance|Completed|Completion note|Exertion):\s*(.*)$/.exec(lines[index]!);
+      const field = /^- (Title|Duration|Distance|Pace|Elevation|Completed|Completion note|Exertion):\s*(.*)$/.exec(lines[index]!);
       if (!field) break;
       if (fields.has(field[1]!)) throw new Error(`Use one ${field[1]!} field per workout on ${date}.`);
       fields.set(field[1]!, field[2]!.trim());
@@ -84,16 +104,25 @@ export function parseTrainingPlan(input: string): TrainingPlan {
     }
     const name = fields.get('Title');
     if (!name) throw new Error(`Add a Title to the workout on ${date}.`);
-    const duration = fields.get('Duration');
-    const durationMatch = /^(\d+(?:\.\d+)?) (s|min|h)$/.exec(duration ?? '');
-    const durationSeconds = durationMatch ? Number(durationMatch[1]) * { s: 1, min: 60, h: 3600 }[durationMatch[2] as 's' | 'min' | 'h'] : undefined;
+    const durationValue = fields.get('Duration');
+    const durationSeconds = durationValue === undefined ? undefined : parseDuration(durationValue);
     const distance = fields.get('Distance');
     const distanceMatch = /^(\d+(?:\.\d+)?) km$/.exec(distance ?? '');
     const distanceKm = distanceMatch ? Number(distanceMatch[1]) : undefined;
-    if ((duration !== undefined && (!durationSeconds || !Number.isSafeInteger(durationSeconds))) ||
+    if ((durationValue !== undefined && !durationSeconds) ||
         (distance !== undefined && (!distanceKm || !Number.isFinite(distanceKm))) ||
         (!durationSeconds && !distanceKm)) {
-      throw new Error(`Add a positive Duration in s, min or h, or Distance in km, to ${name} on ${date}.`);
+      throw new Error(`Use a positive Duration in H:MM, H:MM:SS, s, min or h, or Distance in km, for ${name} on ${date}.`);
+    }
+    const elevation = fields.get('Elevation');
+    const elevationMatch = /^(\d+(?:\.\d+)?) m$/.exec(elevation ?? '');
+    const elevationM = elevationMatch ? Number(elevationMatch[1]) : undefined;
+    if (elevation !== undefined && !Number.isFinite(elevationM)) throw new Error(`Use Elevation in m on ${date}.`);
+    const paceValue = fields.get('Pace');
+    const paceMatch = /^(\d+):([0-5]\d)\s*\/\s*km$/.exec(paceValue ?? '');
+    const paceSecondsPerKm = paceMatch ? Number(paceMatch[1]) * 60 + Number(paceMatch[2]) : undefined;
+    if (paceValue !== undefined && (!paceSecondsPerKm || !Number.isSafeInteger(paceSecondsPerKm))) {
+      throw new Error(`Use a positive Pace in MM:SS / km on ${date}.`);
     }
     const completed = fields.get('Completed');
     if (completed !== undefined && completed !== 'yes' && completed !== 'no') {
@@ -115,6 +144,8 @@ export function parseTrainingPlan(input: string): TrainingPlan {
       description: notes.join('\n').trim(),
       durationSeconds,
       distanceKm,
+      elevationM,
+      paceSecondsPerKm,
       completed: completed === 'yes',
       completionNote: fields.get('Completion note') || undefined,
       exertion: effort === undefined ? undefined : Number(effort),
@@ -136,8 +167,10 @@ export function formatTrainingPlan(plan: TrainingPlan): string {
       lines.push('', `### ${date}`);
     }
     lines.push('', `#### ${workout.sport} · ${workout.type}`, `- Title: ${workout.title}`);
-    if (workout.durationSeconds !== undefined) lines.push(`- Duration: ${workout.durationSeconds} s`);
+    if (workout.durationSeconds !== undefined) lines.push(`- Duration: ${duration(workout.durationSeconds, true)}`);
     if (workout.distanceKm !== undefined) lines.push(`- Distance: ${workout.distanceKm} km`);
+    if (workout.paceSecondsPerKm !== undefined) lines.push(`- Pace: ${pace(workout.paceSecondsPerKm, 1)}`);
+    if (workout.elevationM !== undefined) lines.push(`- Elevation: ${workout.elevationM} m`);
     lines.push(`- Completed: ${workout.completed ? 'yes' : 'no'}`);
     if (workout.completionNote) lines.push(`- Completion note: ${workout.completionNote}`);
     if (workout.exertion !== undefined) lines.push(`- Exertion: ${workout.exertion}`);
@@ -151,15 +184,17 @@ export function toMarkdownPlan(plan: import('./types').Plan): TrainingPlan {
     title: plan.title ?? plan.event.name,
     trainingGoal: plan.trainingGoal,
     eventGoal: plan.eventGoal ?? (plan.trainingGoal ? undefined :
-      `${plan.event.name} on ${plan.event.date} · ${plan.event.distanceKm} km · ${plan.event.elevationM} m gain · Target ${plan.event.targetSeconds} s`),
+      `${plan.event.name} on ${plan.event.date} · ${plan.event.distanceKm} km · ${plan.event.elevationM} m gain · Target ${duration(plan.event.targetSeconds)}`),
     workouts: plan.workouts.filter(workout => workout.sport !== 'rest').map(workout => ({
       date: workout.date,
       sport: workout.sport === 'run' ? 'Run' : 'Ride',
       type: workout.workoutType ?? (workout.intensity === 'hard' ? 'Hard' : 'Easy'),
       title: workout.title,
-      description: [workout.detail, ...workout.steps.map(step => `- ${step.repeats} × ${step.seconds} s ${step.kind} · ${step.target}`)].filter(Boolean).join('\n'),
+      description: [workout.detail, ...workout.steps.map(step => `- ${step.repeats} × ${minutesSeconds(step.seconds)} ${step.kind} · ${step.target}`)].filter(Boolean).join('\n'),
       durationSeconds: workout.durationSeconds || undefined,
       distanceKm: workout.distanceKm || undefined,
+      elevationM: workout.elevationM,
+      paceSecondsPerKm: workout.paceSecondsPerKm,
       completed: workout.completed,
       completionNote: workout.completionNote,
       exertion: workout.exertion,
@@ -175,6 +210,7 @@ export function importPlan(input: string, rules: import('./types').Rules, fallba
     id: uid(), date: workout.date, title: workout.title, detail: workout.description,
     sport: workout.sport === 'Run' ? 'run' : 'ride', workoutType: workout.type,
     durationSeconds: workout.durationSeconds ?? 0, distanceKm: workout.distanceKm ?? 0,
+    elevationM: workout.elevationM, paceSecondsPerKm: workout.paceSecondsPerKm,
     intensity: /hard|threshold|interval|tempo|sprint/i.test(workout.type) ? 'hard' : 'easy',
     long: /long/i.test(workout.type), steps: [],
     completed: workout.completed, completionNote: workout.completionNote, exertion: workout.exertion,
@@ -204,11 +240,13 @@ export function updateSchedule(plan: import('./types').Plan, workouts: import('.
 }
 
 export function activitySummary(activities: import('./types').GarminActivitySummary[], kind: 'csv' | 'md') {
-  const headers = ['Date', 'Sport', 'Duration (s)', 'Distance (km)', 'Average HR (bpm)'];
+  const headers = ['Date', 'Sport', 'Duration (H:MM)', 'Distance (km)', 'Pace (MM:SS / km)', 'Elevation (m)', 'Average HR (bpm)'];
   const rows = activities.map(activity => {
     const date = new Date(activity.startedAt);
     const localDate = Number.isFinite(date.valueOf()) ? localToday(date) : '';
-    return [localDate, activity.sport === 'run' ? 'Run' : 'Ride', activity.durationSeconds, activity.distanceKm, activity.averageHeartRate ?? ''];
+    const averagePace = activity.durationSeconds > 0 && activity.distanceKm > 0 ? pace(activity.durationSeconds, activity.distanceKm) : '';
+    return [localDate, activity.sport === 'run' ? 'Run' : 'Ride', duration(activity.durationSeconds), activity.distanceKm,
+      averagePace, activity.elevationM ?? '', activity.averageHeartRate ?? ''];
   });
   return kind === 'csv' ? [headers, ...rows].map(row => row.join(',')).join('\r\n') + '\r\n' :
     [headers, headers.map(() => '---'), ...rows].map(row => '| ' + row.join(' | ') + ' |').join('\n') + '\n';

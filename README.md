@@ -1,10 +1,10 @@
 # Adaptai
 
-A local-first personal trainer for running and cycling, built with Expo, React Native and TypeScript. Version 0.2.1 uses one externally authored training plan and offers Plan, Chat and Settings.
+A local-first personal trainer for running and cycling, built with Expo, React Native and TypeScript. Version 0.2.2 uses one externally authored training plan and offers Plan, Chat and Settings.
 
 ## First use
 
-1. In Plan, select **Download Markdown template**. Author your plan using the headings shown in the file, then select **Import Markdown plan**. Use a plan title and a training goal, an event goal, or both. Place each workout under its YYYY-MM-DD date, using a sport and type heading, a title, and a duration in seconds, minutes or hours, a distance in kilometres, or both.
+1. In Plan, select **Download Markdown template**. Author your plan using the headings shown in the file, then select **Import Markdown plan**. Use a plan title and a training goal, an event goal, or both. Place each workout under its YYYY-MM-DD date with a sport and type heading, a title, and a duration in `H:MM`, a distance in km, or both. Pace in `MM:SS / km` and elevation in m are optional. Imports also accept `H:MM:SS` and durations with `s`, `min`, or `h` units.
 2. Use Plan to see today and the next six days. Use **Show past workouts and activities** below the entire plan summary to see past planned workouts and synced Garmin activities from the plan period. Edit or swap incomplete upcoming workouts in the schedule. An unstarted past workout can be moved to a future date. Mark today's workout complete even if you only did part of it. Completion notes and exertion from 1 to 10 are optional.
 3. In Settings, configure your OpenRouter key and model. Ask for advice in Chat or use **Propose plan changes**, then review the changes in Plan. Each proposal covers up to seven consecutive calendar days. A changed active plan requires a fresh proposal.
 4. Save Garmin credentials in Settings and connect on Android. Use **Sync activities** in either Plan or Settings. Settings exports cached running and cycling activity summaries in CSV and Markdown.

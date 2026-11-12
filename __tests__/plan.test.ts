@@ -7,7 +7,7 @@ describe('AT-08–15: dates and validated review', () => {
     expect(datesBetween('2026-10-07', '2027-04-11')).toHaveLength(187);
     expect(datesBetween('2027-04-11', '2027-04-11')).toHaveLength(1);
     expect(datesBetween('2027-04-12', '2027-04-11')).toEqual([]);
-    expect(duration(9000)).toBe('2h 30m'); expect(today(new Date(2026, 9, 7))).toBe('2026-10-07');
+    expect(duration(9000)).toBe('2:30'); expect(today(new Date(2026, 9, 7))).toBe('2026-10-07');
   });
   it('selects today through six following days', () => {
     const w = [-1, 0, 6, 7].map(i => session(addDays('2026-12-29', i)));
